@@ -1,3 +1,3 @@
 # DrugGPT
 
-- TODO: add references
+- TODO: add references to code and papers
