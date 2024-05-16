@@ -1,2 +1,4 @@
 *.txt
 *.csv
+*.arrow
+.DS_Store
