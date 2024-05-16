@@ -2,3 +2,5 @@
 *.csv
 *.arrow
 .DS_Store
+
+Architectures/train_from_scratch/Datasets/
