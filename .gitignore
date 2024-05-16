@@ -3,4 +3,4 @@
 *.arrow
 .DS_Store
 
-Architectures/train_from_scratch/Datasets/
+Architectures/train_from_scratch/Datasets/MOSES/datasets/
