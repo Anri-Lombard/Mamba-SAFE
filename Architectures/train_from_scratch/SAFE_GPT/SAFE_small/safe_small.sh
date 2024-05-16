@@ -1,4 +1,20 @@
 #!/bin/bash
+#SBATCH --account=nlpgroup
+#SBATCH --partition=a100
+#SBATCH --nodes=1 --ntasks=1 --gres=gpu:a100-3g-20gb:1
+#SBATCH --time=04:00:00
+#SBATCH --job-name="SAFE_small"
+#SBATCH --mail-user=lmbanr001@myuct.ac.za
+#SBATCH --mail-type=ALL
+
+# Set CUDA_VISIBLE_DEVICES
+CUDA_VISIBLE_DEVICES=$(ncvd)
+
+# Load necessary modules
+module load python/miniconda3-py310
+
+# Activate virtual environment
+source activate architecture_venv
 
 config_path="../trainer/configs/small_config.json"
 tokenizer_path="../tokenizer.json"
@@ -27,3 +43,6 @@ safe-train --config $config_path \
   --load_best_model_at_end True \
   --metric_for_best_model "eval_loss" \
   --greater_is_better False
+
+# Deactivate virtual environment
+conda deactivate
