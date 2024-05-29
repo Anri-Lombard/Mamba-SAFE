@@ -2,7 +2,7 @@
 #SBATCH --account=nlpgroup
 #SBATCH --partition=a100
 #SBATCH --nodes=1 --ntasks=1 --gres=gpu:a100-3g-20gb:1
-#SBATCH --time=04:00:00
+#SBATCH --time=01:00:00
 #SBATCH --job-name="SAFE_small"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
 #SBATCH --mail-type=ALL
@@ -10,7 +10,9 @@
 # Set CUDA_VISIBLE_DEVICES
 CUDA_VISIBLE_DEVICES=$(ncvd)
 
-export WANDB_DISABLED="true"
+# Set your wandb API key
+export WANDB_API_KEY="d68cdf1a94da49b43fbfb7fd90246c39d7c34237"
+export WANDB_MODE="offline"
 
 # Load necessary modules
 module load python/miniconda3-py310
@@ -24,22 +26,18 @@ dataset_path="../../Datasets/MOSES/datasets"
 output_dir="./trained/SAFE_small"
 
 safe-train --config $config_path \
-  --tokenizer $tokenizer_path \
-  --dataset $dataset_path \
-  --report_to none \
-  --text_column "SAFE" \
-  --torch_compile True \
-  --optim "adamw_torch" \
-  --learning_rate 1e-5 \
-  --prop_loss_coeff 1e-3 \
-  --gradient_accumulation_steps 1 \
-  --output_dir $output_dir \
-  --overwrite_output_dir True \
-  --max_steps 5 \
-  --do_train True \
-  --disable_tqdm True
-
-# Need to add do_train and do_eval
+           --tokenizer $tokenizer_path \
+           --dataset $dataset_path \
+           --text_column "SAFE" \
+           --torch_compile True \
+           --optim "adamw_torch" \
+           --learning_rate 1e-5 \
+           --prop_loss_coeff 1e-3 \
+           --gradient_accumulation_steps 1 \
+           --output_dir $output_dir \
+           --overwrite_output_dir True \
+           --max_steps 5 \
+           --do_train True
 
 # Deactivate virtual environment
-conda deactivate(architecture_venv)
+conda deactivate
