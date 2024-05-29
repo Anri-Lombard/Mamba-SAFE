@@ -10,6 +10,8 @@
 # Set CUDA_VISIBLE_DEVICES
 CUDA_VISIBLE_DEVICES=$(ncvd)
 
+export WANDB_DISABLED="true"
+
 # Load necessary modules
 module load python/miniconda3-py310
 
@@ -24,6 +26,7 @@ output_dir="./trained/SAFE_small"
 safe-train --config $config_path \
   --tokenizer $tokenizer_path \
   --dataset $dataset_path \
+  --report_to none \
   --text_column "SAFE" \
   --torch_compile True \
   --optim "adamw_torch" \
@@ -33,9 +36,10 @@ safe-train --config $config_path \
   --output_dir $output_dir \
   --overwrite_output_dir True \
   --max_steps 5 \
-  --do_train True
+  --do_train True \
+  --disable_tqdm True
 
 # Need to add do_train and do_eval
 
 # Deactivate virtual environment
-conda deactivate
+conda deactivate(architecture_venv)
