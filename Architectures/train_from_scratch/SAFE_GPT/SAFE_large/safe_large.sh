@@ -23,7 +23,7 @@ module load python/miniconda3-py310
 # Activate virtual environment
 source activate architecture_venv
 
-config_path="../trainer/configs/small_config.json"
+config_path="../trainer/configs/default_config.json"
 tokenizer_path="../tokenizer.json"
 dataset_path="../../Datasets/MOSES/datasets"
 output_dir="./trained/SAFE_large"
@@ -34,13 +34,13 @@ safe-train --config $config_path \
   --text_column "SAFE" \
   --torch_compile True \
   --optim "adamw_torch" \
-  --learning_rate 1e-5 \
-  --per_device_train_batch_size 16 \
-  --gradient_accumulation_steps 8 \
+  --learning_rate 1e-4 \
+  --per_device_train_batch_size 100 \
+  --gradient_accumulation_steps 2 \
   --num_train_epochs 10 \
   --eval_steps 500 \
   --save_steps 500 \
-  --max_steps 25000 \
+  --max_steps 1000000 \
   --fp16 \
   --prop_loss_coeff 1e-3 \
   --output_dir $output_dir \
