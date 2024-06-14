@@ -4,7 +4,7 @@
 #SBATCH --partition=a100
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gres=gpu:a100-3g-20gb:1
+#SBATCH --gres=gpu:ampere:1
 #SBATCH --time=1:00:00
 #SBATCH --job-name="MAMBA_small"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za

@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --account=nlpgroup
 #SBATCH --partition=a100
-#SBATCH --nodes=1 --ntasks=1 --gres=gpu:a100-3g-20gb:1
+#SBATCH --gres=gpu:ampere:1
 #SBATCH --time=04:00:00
 #SBATCH --job-name="SAFE_small"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
