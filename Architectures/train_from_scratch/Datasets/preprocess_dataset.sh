@@ -7,9 +7,6 @@
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
 #SBATCH --mail-type=ALL
 
-# Set CUDA_VISIBLE_DEVICES
-CUDA_VISIBLE_DEVICES=$(ncvd)
-
 # Load necessary modules
 module load python/miniconda3-py310
 
