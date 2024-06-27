@@ -14,7 +14,7 @@ module load python/miniconda3-py310
 source activate architecture_venv
 
 # Run script
-python3 Datasets/convert_smiles_to_safe.py
+python3 Datasets/convert_smiles_to_selfies.py
 
 # Deactivate virtual environment
 conda deactivate

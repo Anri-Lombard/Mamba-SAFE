@@ -85,3 +85,4 @@ safe-train --config $config_path \
 
 # Deactivate virtual environment
 conda deactivate
+conda deactivate
