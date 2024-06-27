@@ -3,3 +3,7 @@
 *.arrow
 .DS_Store
 *venv*
+*.safetensors
+*.pt
+*.pth
+*.bin

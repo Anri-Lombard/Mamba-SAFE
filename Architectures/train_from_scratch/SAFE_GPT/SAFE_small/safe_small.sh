@@ -9,9 +9,6 @@
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
 #SBATCH --mail-type=ALL
 
-# Set CUDA_VISIBLE_DEVICES
-export CUDA_VISIBLE_DEVICES=$(ncvd)
-
 # export WANDB_MODE="disabled"
 export WANDB_MODE="offline"
 export WANDB_API_KEY="d68cdf1a94da49b43fbfb7fd90246c39d7c34237"
@@ -42,7 +39,7 @@ export WANDB_CACHE_DIR=$wandb_cache_dir
 export WANDB_DIR=$wandb_dir
 
 # Set the TMPDIR environment variable
-export TMPDIR="/scratch/lmbanr001/tmp"
+export TMPDIR="/scratch/lmbanr001/tmp_safe_small"
 
 # Check if the TMPDIR directory exists
 if [ -d "$TMPDIR" ]; then
@@ -67,18 +64,19 @@ output_dir="/scratch/lmbanr001/SAFE_small"
 mkdir -p $output_dir
 mkdir -p $wandb_cache_dir
 
+# 40 epochs since we are using 1 A100 where
+# where they used 4 A100s for 10 epochs
 safe-train --config $config_path \
   --tokenizer $tokenizer_path \
   --dataset $dataset_path \
   --text_column "SAFE" \
-  --torch_compile True \
   --optim "adamw_torch" \
-  --num_train_epochs 1000 \
   --learning_rate 5e-4 \
   --per_device_train_batch_size 16 \
   --gradient_accumulation_steps 8 \
   --eval_steps 500 \
   --save_steps 500 \
+  --num_train_epochs 10 \
   --save_total_limit 2 \
   --prop_loss_coeff 1e-3 \
   --output_dir $output_dir \
