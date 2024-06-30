@@ -7,3 +7,4 @@
 *.pt
 *.pth
 *.bin
+*.parquet
