@@ -2,7 +2,7 @@
   "citation": "",
   "description": "",
   "features": {
-    "SAFE": {
+    "SMILES": {
       "dtype": "string",
       "_type": "Value"
     },

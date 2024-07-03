@@ -5,6 +5,10 @@ import json
 
 import shutil
 
+from rdkit import Chem
+from typing import List, Optional
+from tqdm import tqdm
+
 from time import perf_counter
 
 import torch
@@ -21,6 +25,7 @@ import random
 
 from safe.tokenizer import SAFETokenizer
 from datasets import DatasetDict
+
 # Automated device selection based on available backends
 device = (
         "cuda"
@@ -29,13 +34,16 @@ device = (
         if torch.backends.mps.is_available() and False
         else "cpu"
     )
+
 print(f"> Using {device} device")
+
 def listdir_nohidden(path):
     files = []
     for f in os.listdir(path):
         if not f.startswith('.'):
             files.append(f"{path}/{f}")
     return files
+
 def seed_everything(seed):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -44,6 +52,7 @@ def seed_everything(seed):
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
+
 def load_checkpoint(filepath, model, scheduler, optimizer):
     print(f"> Loading model from: {filepath}")
     try:
@@ -59,14 +68,58 @@ def load_checkpoint(filepath, model, scheduler, optimizer):
             loaded_scheduler.load_state_dict(loaded_checkpoint['scheduler_state'])
         if optimizer is not None:
             loaded_optimizer.load_state_dict(loaded_checkpoint['optimizer_state'])
-        
+
         print("> Loaded model")
         return True, loaded_epoch, loaded_model, loaded_scheduler, loaded_optimizer
     except Exception as e:
         print("> Cannot load model")
         return False, 0, model, scheduler, optimizer
+
 def count_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+def prepare_molecular_dataset(dataset, tokenizer):
+    def tokenize_function(examples):
+        return {"input_ids": tokenizer.encode(examples["SAFE"], ids_only=True)}
+    
+    tokenized_dataset = dataset.map(tokenize_function, batched=True, remove_columns=dataset.column_names)
+    
+    # Sort the dataset by length
+    def get_length(example):
+        return len(example['input_ids'])
+    
+    sorted_dataset = sorted(tokenized_dataset, key=get_length)
+    
+    return sorted_dataset
+
+def create_batches(dataset, batch_size):
+    batches = []
+    current_batch = []
+    current_length = 0
+    
+    for item in dataset:
+        if len(current_batch) == batch_size:
+            batches.append(current_batch)
+            current_batch = []
+            current_length = 0
+        
+        current_batch.append(item)
+        current_length = max(current_length, len(item['input_ids']))
+        
+    if current_batch:
+        batches.append(current_batch)
+    
+    return batches
+
+def pad_batch(batch, pad_token_id=0):
+    max_length = max(len(item['input_ids']) for item in batch)
+    padded_batch = []
+    for item in batch:
+        padded_input = item['input_ids'] + [pad_token_id] * (max_length - len(item['input_ids']))
+        padded_batch.append(padded_input)
+    return torch.tensor(padded_batch)
+
+
 def train(pretrained=False):
     # Training parameters
     '''
@@ -77,14 +130,12 @@ def train(pretrained=False):
     model_path - path to the saved weights; if empty it'll save there new weights during training
     backup_path - path to the backup of a model. if None - no backup is created
     '''
-    epochs = 10 # Similar to SAFE_small
-    steps_per_epoch = 12000 # Similar to SAFE_small
+    epochs = 1
     checkpoint_interval = 1000
     batch_size = 64 #32 for 24GB and 130m model
-    seq_length = 69
-    learning_rate = 1e-3
+    seq_length = 128
+    learning_rate = 1e-4
     model_path = f'saves/model.pth'
-    backup_path = f"saves/model-b.pth"
     max_checkpoints = 2  # Keep only the last 2 checkpoints
 
 
@@ -115,23 +166,22 @@ def train(pretrained=False):
     # tokenizer.pad_token = tokenizer.eos_token
 
     # Tokenize the dataset
-    def tokenize_function(examples):
-        return {"input_ids": tokenizer.encode(examples["SAFE"], ids_only=True)}
+    # def tokenize_function(examples):
+    #     return {"input_ids": tokenizer.encode(examples["SAFE"], ids_only=True)}
 
     # Map tokenizer to the dataset
-    tokenized_dataset = dataset.map(tokenize_function, batched=True, remove_columns=dataset['train'].column_names)
+    # tokenized_dataset = dataset.map(tokenize_function, batched=True, remove_columns=dataset['train'].column_names)
     # tokenize_data = lambda example, tokenizer: {'tokens': tokenizer.tokenize(example['text'], truncation=True)} 
     # tokenized_dataset = dataset.map(tokenize_data, remove_columns=['text'], 
     #     fn_kwargs={'tokenizer': tokenizer})
+
+
     
     # Prepare and load tokenizer's vocabulary for later use
     # vocab = tokenizer.vocab
     # print(f"Vocab size: {len(vocab)}")
     vocab_size = 1180 # safe tokenizer vocab size
     print(f"Vocab size: {vocab_size}")
-
-    max_seq_length = max(len(seq) for seq in tokenized_dataset['train']['input_ids'])
-    print(f"Maximum sequence length: {max_seq_length}")
 
     
     # Select the wanted model
@@ -165,110 +215,130 @@ def train(pretrained=False):
     _, epoch, model, scheduler, optim = load_checkpoint(model_path, model, scheduler, optim)
     
     # Create data loader functions
-    def get_data(dataset, batch_size, max_length):
-        # data = []                                   
-        # for example in dataset:
-        #     if example['tokens']:
-        #         tokens = [vocab[token] for token in example['tokens']]
-        #         data.extend(tokens)
+    # def get_data(dataset, batch_size, max_length):
+    #     # data = []                                   
+    #     # for example in dataset:
+    #     #     if example['tokens']:
+    #     #         tokens = [vocab[token] for token in example['tokens']]
+    #     #         data.extend(tokens)
         
-        # data = torch.LongTensor(data)              
-        # num_batches = data.shape[0] // batch_size 
-        # data = data[:num_batches * batch_size]                       
-        # data = data.view(batch_size, num_batches)
-        # return data     
+    #     # data = torch.LongTensor(data)              
+    #     # num_batches = data.shape[0] // batch_size 
+    #     # data = data[:num_batches * batch_size]                       
+    #     # data = data.view(batch_size, num_batches)
+    #     # return data     
 
-        # Pad sequences to max_length
-        padded_data = [seq + [0] * (max_length - len(seq)) for seq in dataset['input_ids']]
-        data = torch.LongTensor(padded_data)
-        num_batches = data.shape[0] // batch_size 
-        data = data[:num_batches * batch_size]
-        data = data.view(batch_size, -1)
-        return data
+    #     # Pad sequences to max_length
+    #     padded_data = [seq + [0] * (max_length - len(seq)) for seq in dataset['input_ids']]
+    #     data = torch.LongTensor(padded_data)
+    #     num_batches = data.shape[0] // batch_size 
+    #     data = data[:num_batches * batch_size]
+    #     data = data.view(batch_size, -1)
+    #     return data
 
-    def get_batch(data, seq_len, idx):
-        src = data[:, idx:idx+seq_len]
-        target = data[:, idx+1:idx+seq_len+1]
-        return src, target
+    # def get_batch(data, seq_len, idx):
+    #     src = data[:, idx:idx+seq_len]
+    #     target = data[:, idx+1:idx+seq_len+1]
+    #     return src, target
 
 
-    # Get data
-    train_data = get_data(tokenized_dataset['train'], batch_size, max_seq_length)
-    print(f"Train data shape: {train_data.shape}")
+    # # Get data
+    # train_data = get_data(tokenized_dataset['train'], batch_size, max_seq_length)
+    # print(f"Train data shape: {train_data.shape}")
+
+    prepared_dataset = prepare_molecular_dataset(dataset['train'], tokenizer)
 
     # Training loop
     losses = defaultdict(list)
     t0_start = perf_counter()
     for z in range(epoch, epochs):
-        idx = 0
+        # idx = 0
         avg_loss = 0
         print(f"\n> Epoch {z+1}/{epochs}")
 
         t2_start = perf_counter()
-        for i in range(steps_per_epoch):
+
+        # Shuffle the dataset at the start of each epoch
+        random.shuffle(prepared_dataset)
+
+        # Create batches
+        batches = create_batches(prepared_dataset, batch_size)
+        
+        # for i in range(train_data.shape[-1]):
+        for i, batch in enumerate(batches):
             model.train()
             t1_start = perf_counter()
 
-            input, output = get_batch(train_data, seq_length, idx)
-            output = output.reshape(-1)
-            input = input.to(device)
-            output = output.to(device)
+            # idx = i * seq_length
+            # input, output = get_batch(train_data, seq_length, idx)
+            # output = output.reshape(-1)
+            # input = input.to(device)
+            # output = output.to(device)
 
-            logits = model(input)
+            input_ids = pad_batch(batch).to(device)
+            attention_mask = (input_ids != 0).float().to(device)
 
-            # If the batch is not complete - skip
-            if (logits.view(-1, logits.size(-1)).shape[0] != output.view(-1).shape[0]):
-                print("skip")
-            else:
-                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), output, ignore_index=0)  # ignore padding
-                avg_loss += loss.item()
-                losses[z].append(loss.item())
+            # Shift the input_ids to create targets
+            targets = input_ids[:, 1:].contiguous()
+            input_ids = input_ids[:, :-1].contiguous()
 
-                optim.zero_grad()
-                loss.backward()
-                optim.step()
+            # logits = model(input)
+            logits = model(input_ids)
 
-                t1_stop = perf_counter()
+            # # If the batch is not complete - skip
+            # if (logits.view(-1, logits.size(-1)).shape[0] != output.view(-1).shape[0]):
+            #     print("skip")
+            # else:
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=0)  # ignore padding
+            avg_loss += loss.item()
+            losses[z].append(loss.item())
 
-                # Print the progress during training and save the model
-                if i%10==0:
-                    print(f"\r> Batch: {idx}/{steps_per_epoch} loss: {avg_loss/(i+1):.5f} time: {t1_stop-t1_start:.2f} sec ", end="")
+            optim.zero_grad()
+            loss.backward()
+            optim.step()
 
-                    checkpoint = {
-                        'epoch': z,
-                        'model_state': model.state_dict(),
-                        'optimizer_state': optim.state_dict(),
-                        'scheduler_state': scheduler.state_dict(),
-                    }
-                    # Create backup file
-                    if backup_path is not None and os.path.isfile(model_path):
-                        shutil.copyfile(model_path, backup_path)
-                    torch.save(checkpoint, model_path)
+            t1_stop = perf_counter()
 
-                    if i % checkpoint_interval == 0:
-                        checkpoint = {
-                            'epoch': z,
-                            'model_state': model.state_dict(),
-                            'optimizer_state': optim.state_dict(),
-                            'scheduler_state': scheduler.state_dict(),
-                        }
-                        checkpoint_path = f'saves/checkpoint_epoch{z}_step{i}.pth'
-                        torch.save(checkpoint, checkpoint_path)
-                        
-                        # Remove old checkpoints if there are more than max_checkpoints
-                        checkpoints = sorted([f for f in os.listdir('saves') if f.startswith('checkpoint') and f.endswith('.pth')])
-                        if len(checkpoints) > max_checkpoints:
-                            os.remove(os.path.join('saves', checkpoints[0]))
+            # Print the progress during training and save the model
+            if i%100==0:
+                print(f"\r> Batch: {i}/{len(batches)} loss: {avg_loss/(i+1):.5f} time: {t1_stop-t1_start:.2f} sec ", end="")
+
+                # checkpoint = {
+                #     'epoch': z,
+                #     'model_state': model.state_dict(),
+                #     'optimizer_state': optim.state_dict(),
+                #     'scheduler_state': scheduler.state_dict(),
+                # }
+                # # Create backup file
+                # if backup_path is not None and os.path.isfile(model_path):
+                #     shutil.copyfile(model_path, backup_path)
+                # torch.save(checkpoint, model_path)
+
+            if i % checkpoint_interval == 0:
+                checkpoint = {
+                    'epoch': z,
+                    'model_state': model.state_dict(),
+                    'optimizer_state': optim.state_dict(),
+                    'scheduler_state': scheduler.state_dict(),
+                }
+                checkpoint_path = f'saves/checkpoint_epoch{z}_step{i}.pth'
+                torch.save(checkpoint, checkpoint_path)
+                
+                # Remove old checkpoints if there are more than max_checkpoints
+                checkpoints = sorted([f for f in os.listdir('saves') if f.startswith('checkpoint') and f.endswith('.pth')])
+                if len(checkpoints) > max_checkpoints:
+                    os.remove(os.path.join('saves', checkpoints[0]))
 
             # Increment idx
-            idx += 1
-            if idx >= train_data.shape[-1] - max_seq_length:
-                break
+            # idx += 1
+            # if idx >= train_data.shape[-1] - max_seq_length:
+            #     idx = 0
+            #     break
 
         t2_stop = perf_counter()
         print(f"\n> Epoch time: {t2_stop - t2_start:.3f} seconds")
         # Update schedulers
-        scheduler.step(avg_loss/(i+1))
+        scheduler.step(avg_loss/len(batches))
 
     t0_stop = perf_counter()
     print(f"\n> Finished training in: {t0_stop-t0_start} seconds")
@@ -295,48 +365,107 @@ def train(pretrained=False):
     with open('loss_history.json', 'w') as f:
         json.dump(losses, f)
 
-def generate_molecule(model, tokenizer, max_length=100, temperature=0.8, top_k=None):
-    start_token = tokenizer.encode("[START]", ids_only=True)
-    input_ids = torch.tensor(start_token).unsqueeze(0).to(device)
+
+def de_novo_generation(
+    model: MambaLM,
+    tokenizer: SAFETokenizer,
+    n_samples: int = 10,
+    sanitize: bool = False,
+    n_trials: Optional[int] = None,
+    max_length: int = 100,
+    temperature: float = 0.8,
+    top_k: Optional[int] = None,
+    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+) -> List[str]:
+    """
+    Perform de novo generation using the trained Mamba model.
+
+    Args:
+        model: The trained Mamba model
+        tokenizer: The SAFE tokenizer
+        n_samples: Number of new molecules to generate per trial
+        sanitize: Whether to perform sanitization to ensure validity
+        n_trials: Number of trials to perform (default is 1)
+        max_length: Maximum length of generated sequences
+        temperature: Sampling temperature
+        top_k: If set, only sample from the top k most likely next tokens
+        device: Device to use for generation
+
+    Returns:
+        List of generated molecular sequences
+    """
+    model.eval()
+    model.to(device)
+
+    total_sequences = []
+    n_trials = n_trials or 1
+
+    for _ in tqdm(range(n_trials), desc="Generating molecules", leave=False):
+        sequences = []
+        for _ in range(n_samples):
+            start_token = tokenizer.encode("[START]", ids_only=True)
+            input_ids = torch.tensor(start_token).unsqueeze(0).to(device)
+            
+            for _ in range(max_length):
+                with torch.no_grad():
+                    outputs = model(input_ids)
+                    next_token_logits = outputs[:, -1, :] / temperature
+                    
+                    if top_k is not None:
+                        top_k_logits, top_k_indices = torch.topk(next_token_logits, top_k)
+                        next_token_logits[0, :] = float('-inf')
+                        next_token_logits[0, top_k_indices] = top_k_logits
+                    
+                    probs = F.softmax(next_token_logits, dim=-1)
+                    next_token = torch.multinomial(probs, num_samples=1)
+                    
+                    if next_token.item() == tokenizer.encode("[END]", ids_only=True)[0]:
+                        break
+                    
+                    input_ids = torch.cat([input_ids, next_token], dim=-1)
+            
+            generated_ids = input_ids[0].tolist()
+            sequences.append(tokenizer.decode(generated_ids))
+        
+        total_sequences.extend(sequences)
+
+    if sanitize:
+        total_sequences = [seq for seq in total_sequences if is_valid_molecule(seq)]
+
+    return total_sequences
+
+def is_valid_molecule(smiles: str) -> bool:
+    """Check if a SMILES string represents a valid molecule."""
+    mol = Chem.MolFromSmiles(smiles)
+    return mol is not None
+
+# Usage example
+def generate_molecules(model_path: str, tokenizer_path: str, n_samples: int = 10):
+    tokenizer = SAFETokenizer.from_pretrained(tokenizer_path)
     
-    for _ in range(max_length):
-        with torch.no_grad():
-            outputs = model(input_ids)
-            next_token_logits = outputs[:, -1, :] / temperature
-            
-            if top_k is not None:
-                top_k_logits, top_k_indices = torch.topk(next_token_logits, top_k)
-                next_token_logits[0, :] = float('-inf')
-                next_token_logits[0, top_k_indices] = top_k_logits
-            
-            probs = F.softmax(next_token_logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1)
-            
-            if next_token.item() == tokenizer.encode("[END]", ids_only=True)[0]:
-                break
-            
-            input_ids = torch.cat([input_ids, next_token], dim=-1)
-    
-    generated_ids = input_ids[0].tolist()
-    return tokenizer.decode(generated_ids)
-def de_novo_generation(num_molecules=10, pretrained=False):
-    tokenizer = SAFETokenizer.from_pretrained("./tokenizer.json")
+    config = MambaLMConfig(d_model=768, n_layers=6, vocab_size=tokenizer.vocab_size)
+    model = MambaLM(config)
 
-    if pretrained:
-        model = from_pretrained('state-spaces/mamba-130m').to(device)
-    else:
-        config = MambaLMConfig(d_model=16, n_layers=4, vocab_size=tokenizer.vocab_size)
-        model = MambaLM(config).to(device)
+    checkpoint = torch.load(model_path, map_location='cpu')
+    model.load_state_dict(checkpoint['model_state'])
 
-    isLoaded, _, model, *_ = load_checkpoint(f'saves/model.pth', model, None, None)
-    if (not isLoaded):
-        print("Could not load model. Please train the model first.")
-        return
+    generated_molecules = de_novo_generation(
+        model,
+        tokenizer,
+        n_samples=n_samples,
+        sanitize=True,
+        n_trials=1,
+        max_length=100,
+        temperature=0.8,
+        top_k=50
+    )
 
-    print(f"Generating {num_molecules} new molecules:")
-    for i in range(num_molecules):
-        molecule = generate_molecule(model, tokenizer)
-        print(f"Molecule {i+1}: {molecule}")
+    print(f"Generated {len(generated_molecules)} valid molecules:")
+    for i, mol in enumerate(generated_molecules, 1):
+        print(f"Molecule {i}: {mol}")
+
+    return generated_molecules
+
 def prepare_folders():
     try:
         os.makedirs("./saves/")
