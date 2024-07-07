@@ -1,0 +1,6 @@
+{
+  "d_model": 16,
+  "d_state": 64,
+  "d_conv": 4,
+  "expand": 2
+}

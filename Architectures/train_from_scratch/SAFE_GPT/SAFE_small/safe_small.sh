@@ -69,20 +69,27 @@ mkdir -p $wandb_cache_dir
 safe-train --config $config_path \
   --tokenizer $tokenizer_path \
   --dataset $dataset_path \
-  --text_column "SAFE" \
+  --text_column "SMILES" \
+  --is_tokenized False \
+  --streaming True \
   --optim "adamw_torch" \
   --learning_rate 5e-4 \
-  --per_device_train_batch_size 16 \
-  --gradient_accumulation_steps 8 \
+  --per_device_train_batch_size 32 \
+  --gradient_accumulation_steps 2 \
+  --warmup_steps 2000 \
   --eval_steps 500 \
   --save_steps 500 \
   --num_train_epochs 10 \
-  --save_total_limit 2 \
+  --save_total_limit 1 \
   --prop_loss_coeff 1e-3 \
   --output_dir $output_dir \
   --overwrite_output_dir True \
-  --do_train True
+  --do_train True \
+  --do_eval True \
+  --save_safetensors True \
+  --gradient_checkpointing True \
+  --eval_accumulation_steps 100 \
+  --max_steps 125_000
 
 # Deactivate virtual environment
-conda deactivate
 conda deactivate

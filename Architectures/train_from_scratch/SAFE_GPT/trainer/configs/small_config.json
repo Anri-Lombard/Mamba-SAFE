@@ -1,9 +1,9 @@
 {
   "activation_function": "gelu_new",
   "attn_pdrop": 0.1,
-  "bos_token_id": 10000,
+  "bos_token_id": 1,
   "embd_pdrop": 0.1,
-  "eos_token_id": 1,
+  "eos_token_id": 2,
   "initializer_range": 0.02,
   "layer_norm_epsilon": 1e-5,
   "model_type": "gpt2",
@@ -24,6 +24,6 @@
   "summary_use_proj": true,
   "transformers_version": "4.31.0",
   "use_cache": true,
-  "vocab_size": 10000,
-  "num_labels": 9
+  "vocab_size": 1880,
+  "num_labels": 1
 }

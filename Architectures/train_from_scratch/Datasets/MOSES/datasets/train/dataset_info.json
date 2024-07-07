@@ -2,11 +2,11 @@
   "citation": "",
   "description": "",
   "features": {
-    "SPLIT": {
+    "SMILES": {
       "dtype": "string",
       "_type": "Value"
     },
-    "SAFE": {
+    "SPLIT": {
       "dtype": "string",
       "_type": "Value"
     }
