@@ -2,7 +2,7 @@
 #SBATCH --account=nlpgroup
 #SBATCH --partition=a100
 #SBATCH --nodes=1
-#SBATCH --ntasks=8
+#SBATCH --ntasks=1
 #SBATCH --gres=gpu:ampere:1
 #SBATCH --time=48:00:00
 #SBATCH --job-name="SAFE_small"
@@ -80,15 +80,16 @@ safe-train --config $config_path \
   --eval_steps 500 \
   --save_steps 500 \
   --num_train_epochs 10 \
-  --save_total_limit 2 \
+  --save_total_limit 1 \
   --prop_loss_coeff 1e-3 \
   --output_dir $output_dir \
   --overwrite_output_dir True \
   --do_train True \
+  --do_eval True \
   --save_safetensors True \
   --gradient_checkpointing True \
   --eval_accumulation_steps 100 \
-  --max_steps 30_000_000
+  --max_steps 125_000
 
 # Deactivate virtual environment
 conda deactivate

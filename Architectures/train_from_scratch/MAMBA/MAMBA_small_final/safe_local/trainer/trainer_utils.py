@@ -2,6 +2,10 @@ from transformers import Trainer
 from transformers.modeling_utils import unwrap_model
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 
+import torch
+import os
+
+from typing import Optional
 
 class SAFETrainer(Trainer):
     """
@@ -24,6 +28,11 @@ class SAFETrainer(Trainer):
         )
 
         outputs = model(**inputs)
+
+        if len(outputs) == 4:  # For MAMBADoubleHeadsModel
+            lm_loss, mc_loss, lm_logits, mc_logits = outputs
+        else:  # For SAFEDoubleHeadsModel
+            lm_loss, mc_loss = outputs[:2]
         # Save past state if it exists
         # TODO: this needs to be fixed and made cleaner later.
         if self.args.past_index >= 0:
@@ -46,3 +55,23 @@ class SAFETrainer(Trainer):
         if mc_loss is not None:
             loss = loss + self.prop_loss_coeff * mc_loss
         return (loss, outputs) if return_outputs else loss
+
+    def _save(self, output_dir: Optional[str] = None, state_dict=None):
+        output_dir = output_dir if output_dir is not None else self.args.output_dir
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Handle shared weights
+        if state_dict is None:
+            state_dict = self.model.state_dict()
+
+        # Remove duplicate weights
+        if 'mamba.lm_head.weight' in state_dict and 'mamba.backbone.embedding.weight' in state_dict:
+            if torch.equal(state_dict['mamba.lm_head.weight'], state_dict['mamba.backbone.embedding.weight']):
+                del state_dict['mamba.lm_head.weight']
+
+        # Save the state dict
+        torch.save(state_dict, os.path.join(output_dir, 'pytorch_model.bin'))
+
+        # Save the config
+        if hasattr(self.model, 'config'):
+            self.model.config.save_pretrained(output_dir)

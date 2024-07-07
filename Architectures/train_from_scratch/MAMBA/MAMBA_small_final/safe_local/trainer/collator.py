@@ -7,7 +7,7 @@ import torch
 from tokenizers import Tokenizer
 from transformers.data.data_collator import _torch_collate_batch
 
-from safe.tokenizer import SAFETokenizer
+from safe_local.tokenizer import SAFETokenizer
 
 
 class SAFECollator:
@@ -110,6 +110,8 @@ class SAFECollator:
                 }
             )
 
+        batch.pop("token_type_ids", None)
+
         # Not yet sure if this is going to work
         if self.model_type == "mamba":
             # Mamba doesn't use attention mask, so we remove it
@@ -118,4 +120,5 @@ class SAFECollator:
             if "position_ids" not in batch:
                 batch["position_ids"] = torch.arange(batch["input_ids"].shape[1], dtype=torch.long).unsqueeze(0).expand(batch["input_ids"].shape)
 
-        return batch
+        # Clone all tensors to ensure they don't share memory
+        return {k: v.clone() if isinstance(v, torch.Tensor) else v for k, v in batch.items()}

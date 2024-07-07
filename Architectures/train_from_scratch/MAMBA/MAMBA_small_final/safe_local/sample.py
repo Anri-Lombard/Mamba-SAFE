@@ -14,11 +14,11 @@ from tqdm.auto import tqdm
 from transformers import GenerationConfig
 from transformers.generation import DisjunctiveConstraint, PhrasalConstraint
 
-import safe as sf
-from safe.tokenizer import SAFETokenizer
-from safe.trainer.model import SAFEDoubleHeadsModel
+import safe_local as sf
+from safe_local.tokenizer import SAFETokenizer
+from safe_local.trainer.model import SAFEDoubleHeadsModel
 
-from mamba_model import MAMBADoubleHeadsModel
+from safe_local.trainer.mamba_model import MAMBADoubleHeadsModel
 
 
 class SAFEDesign:
@@ -574,16 +574,17 @@ class SAFEDesign:
         total_sequences = []
         n_trials = n_trials or 1
         for _ in tqdm(range(n_trials), disable=(not self.verbose), leave=False):
-            sequences = self._generate(n_samples=n_samples_per_trial, **kwargs)
+            sequences = self._generate(n_samples=n_samples_per_trial, safe_prefix=None, **kwargs)
             total_sequences.extend(sequences)
         total_sequences = self._decode_safe(
             total_sequences, canonical=True, remove_invalid=sanitize
         )
 
         if sanitize and self.verbose:
-            logger.info(
-                f"After sanitization, {len(total_sequences)} / {n_samples_per_trial*n_trials} ({len(total_sequences)*100/(n_samples_per_trial*n_trials):.2f} %) generated molecules are valid !"
-            )
+                logger.info(
+                    f"After sanitization, {len(total_sequences)} / {n_samples_per_trial*n_trials} ({len(total_sequences)*100/(n_samples_per_trial*n_trials):.2f} %) generated molecules are valid !"
+                )
+
         return total_sequences
 
     def _find_fragment_cut(self, fragment: str, prefix_constraint: str, branching_id: str):
@@ -774,123 +775,36 @@ class SAFEDesign:
         safe_prefix: Optional[str] = None,
         max_length: Optional[int] = 100,
         how: Optional[str] = "random",
-        num_beams: Optional[int] = None,
-        num_beam_groups: Optional[int] = None,
-        do_sample: Optional[bool] = None,
         **kwargs,
     ):
-        """Sample a new sequence using the underlying hugging face model.
-        This emulates the izanagi sampling models, if you wish to retain the hugging face generation
-        behaviour, either call the hugging face functions directly or overwrite this function
-
-        ??? note "Generation Parameters"
-            From the hugging face documentation:
-
-            * `greedy decoding` if how="greedy" and num_beams=1 and do_sample=False.
-            * `multinomial sampling` if num_beams=1 and do_sample=True.
-            * `beam-search decoding` if how="beam" and num_beams>1 and do_sample=False.
-            * `beam-search multinomial` sampling by calling if beam=True, num_beams>1 and do_sample=True or how="random" and num_beams>1
-            * `diverse beam-search decoding` if num_beams>1 and num_beam_groups>1
-
-            It's also possible to ignore the 'how' shortcut and directly call the underlying generation methods using the proper arguments.
-            Learn more here: https://huggingface.co/docs/transformers/v4.32.0/en/main_classes/text_generation#transformers.GenerationConfig
-            Under the hood, the following will be applied depending on the arguments:
-
-            * greedy decoding by calling greedy_search() if num_beams=1 and do_sample=False
-            * contrastive search by calling contrastive_search() if penalty_alpha>0. and top_k>1
-            * multinomial sampling by calling sample() if num_beams=1 and do_sample=True
-            * beam-search decoding by calling beam_search() if num_beams>1 and do_sample=False
-            * beam-search multinomial sampling by calling beam_sample() if num_beams>1 and do_sample=True
-            * diverse beam-search decoding by calling group_beam_search(), if num_beams>1 and num_beam_groups>1
-            * constrained beam-search decoding by calling constrained_beam_search(), if constraints!=None or force_words_ids!=None
-            * assisted decoding by calling assisted_decoding(), if assistant_model is passed to .generate()
-
-        Args:
-            n_samples: number of sequences to return
-            safe_prefix: Prefix to use in sampling, should correspond to a safe fragment
-            max_length : maximum length of sampled sequence
-            how: which sampling method to use: "beam", "greedy" or "random". Can be used to control other parameters by setting defaults
-            num_beams: number of beams for beam search. 1 means no beam search, unless beam is specified then max(n_samples, num_beams) is used
-            num_beam_groups: number of beam groups for diverse beam search
-            do_sample: whether to perform random sampling or not, equivalent to setting random to True
-            kwargs: any additional keyword argument to pass to the underlying sampling `generate`  from hugging face transformer
-
-        Returns:
-            samples: list of sampled molecules, including failed validation
-
-        """
         pretrained_tk = self.tokenizer.get_pretrained()
-        if getattr(pretrained_tk, "model_max_length") is None:
-            setattr(
-                pretrained_tk,
-                "model_max_length",
-                self._DEFAULT_MAX_LENGTH,  # this was the defaul
-            )
 
         input_ids = safe_prefix
         if isinstance(safe_prefix, str):
-            # EN: should we address the special token issues
             input_ids = pretrained_tk(
                 safe_prefix,
                 return_tensors="pt",
-            )
+            ).input_ids.to(self.model.device)
 
-        num_beams = num_beams or None
-        do_sample = do_sample or False
+        kwargs['output_scores'] = True
 
-        if how == "random":
-            do_sample = True
-
-        elif how is not None and "beam" in how:
-            num_beams = max((num_beams or 0), n_samples)
-
-        is_greedy = how == "greedy" or (num_beams in [0, 1, None]) and do_sample is False
-
-        kwargs["do_sample"] = do_sample
-        if num_beams is not None:
-            kwargs["num_beams"] = num_beams
-        if num_beam_groups is not None:
-            kwargs["num_beam_groups"] = num_beam_groups
-        kwargs["output_scores"] = True
-        kwargs["return_dict_in_generate"] = True
-        kwargs["num_return_sequences"] = n_samples
-        kwargs["max_length"] = max_length
-        kwargs.setdefault("early_stopping", True)
-        # EN we don't do anything with the score that the model might return on generate ...
         if not isinstance(input_ids, Mapping):
-            input_ids = {"inputs": None}
+            input_ids = {"input_ids": input_ids}
         else:
-            # EN: we remove the EOS token added before running the prediction
-            # because the model output nonsense when we keep it.
-            # I don't know why it works for text generation but not here
             for k in input_ids:
-                input_ids[k] = input_ids[k][:, :-1]
+                input_ids[k] = input_ids[k].to(self.model.device)
 
-        for k, v in input_ids.items():
-            if torch.is_tensor(v):
-                input_ids[k] = v.to(self.model.device)
 
-        # Unified for both SAFE and MAMBA
-        if is_greedy:
-            kwargs["num_return_sequences"] = 1
-            if num_beams is not None and num_beams > 1:
-                raise ValueError("Cannot set num_beams|num_beam_groups > 1 for greedy")
-            # under greedy decoding there can only be a single solution
-            # we just duplicate the solution several time for efficiency
-            outputs = self.model.generate(
-                **input_ids,
-                generation_config=self.generation_config,
-                **kwargs,
-            )
-            sequences = [
-                pretrained_tk.decode(outputs.sequences.squeeze(), skip_special_tokens=True)
-            ] * n_samples
+        # Generate sequences
+        outputs = self.model.generate(
+            **input_ids,
+            max_length=max_length,
+            num_return_sequences=n_samples,
+            **kwargs
+        )
 
-        else:
-            outputs = self.model.generate(
-                **input_ids,
-                generation_config=self.generation_config,
-                **kwargs,
-            )
-            sequences = pretrained_tk.batch_decode(outputs.sequences, skip_special_tokens=True)
+        # Decode the generated sequences
+        sequences = pretrained_tk.batch_decode(outputs, skip_special_tokens=True)
+
         return sequences
+

@@ -1,9 +1,11 @@
 import math
 import os
+
 import sys
 import uuid
 from dataclasses import dataclass, field
 from typing import Literal, Optional
+import json
 
 import datasets
 import evaluate
@@ -14,16 +16,30 @@ from transformers import AutoConfig, AutoTokenizer, TrainingArguments, set_seed
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils.logging import log_levels as LOG_LEVELS
 
-import safe
-from safe.tokenizer import SAFETokenizer
-from safe.trainer.collator import SAFECollator
-from safe.trainer.data_utils import get_dataset
-from safe.trainer.model import SAFEDoubleHeadsModel
-from safe.trainer.trainer_utils import SAFETrainer
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(os.path.dirname(current_dir))
+sys.path.insert(0, parent_dir)
+
+print("Current working directory:", os.getcwd())
+print("Python path:", sys.path)
+
+try:
+    import safe_local
+    print("Successfully imported safe_local")
+except ImportError as e:
+    print(f"Failed to import safe_local: {e}")
+    print("Contents of parent directory:")
+    print(os.listdir(parent_dir))
+
+from safe_local.tokenizer import SAFETokenizer
+from safe_local.trainer.collator import SAFECollator
+from safe_local.trainer.data_utils import get_dataset
+from safe_local.trainer.model import SAFEDoubleHeadsModel
+from safe_local.trainer.trainer_utils import SAFETrainer
 
 from mamba_model import MAMBAConfig, MAMBADoubleHeadsModel
 
-CURRENT_DIR = os.path.join(safe.__path__[0], "trainer")
+CURRENT_DIR = os.path.join(safe_local.__path__[0], "trainer")
 
 
 @dataclass
@@ -259,10 +275,12 @@ def train(model_args, data_args, training_args):
 
         model_class = SAFEDoubleHeadsModel
     elif model_args.model_type == "mamba":
-        config = MAMBAConfig.from_pretrained(config, cache_dir=model_args.cache_dir)
+        # Load the config file
+        with open(model_args.config, 'r') as f:
+            config_dict = json.load(f)
 
-        if model_args.num_labels is not None:
-            config.num_labels = int(model_args.num_labels)
+        # Initialize MAMBAConfig with the loaded dictionary
+        config = MAMBAConfig(**config_dict)
 
         model_class = MAMBADoubleHeadsModel
     else:
@@ -303,7 +321,7 @@ def train(model_args, data_args, training_args):
 
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
-    embedding_size = model.get_input_embeddings().weight.shape[0]
+    embedding_size = model.get_input_embeddings().num_embeddings
     if len(tokenizer) > embedding_size:
         model.resize_token_embeddings(len(tokenizer))
 

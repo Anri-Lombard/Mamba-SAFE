@@ -7,7 +7,7 @@ import datasets
 import upath
 from tqdm.auto import tqdm
 
-from safe.tokenizer import SAFETokenizer
+from safe_local.tokenizer import SAFETokenizer
 
 
 def take(n, iterable):
@@ -94,7 +94,9 @@ def get_dataset(
 ):
     """Get the datasets from the config file"""
     raw_datasets = {}
+    print(f'{data_path} is not none: {data_path is not None}')
     if data_path is not None:
+        print(f'{data_path}')
         data_path = upath.UPath(str(data_path))
 
         if data_path.exists():
@@ -122,6 +124,7 @@ def get_dataset(
                     setattr(raw_datasets, "num_examples", num_examples)
 
         else:
+            # data_path = str(data_path)
             raw_datasets = datasets.load_dataset(
                 data_path,
                 name=name,

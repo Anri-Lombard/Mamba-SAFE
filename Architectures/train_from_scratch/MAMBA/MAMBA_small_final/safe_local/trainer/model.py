@@ -41,11 +41,17 @@ class PropertyHead(torch.nn.Module):
 
         self.summary_type = getattr(config, "summary_type", "cls_index")
         self.summary = torch.nn.Identity()
-        last_hidden_size = config.hidden_size
+
+        # Use d_model for MAMBA, hidden_size for SAFE
+        last_hidden_size = getattr(config, "d_model", getattr(config, "hidden_size", None))
+        if last_hidden_size is None:
+            raise ValueError("Config must have either 'd_model' or 'hidden_size' attribute")
 
         if getattr(config, "summary_hidden_size", None) and config.summary_hidden_size > 0:
             self.summary = nn.Linear(config.hidden_size, config.summary_hidden_size)
             last_hidden_size = config.summary_hidden_size
+        else:
+            self.summary = nn.Identity()
 
         activation_string = getattr(config, "summary_activation", None)
         self.activation: Callable = (

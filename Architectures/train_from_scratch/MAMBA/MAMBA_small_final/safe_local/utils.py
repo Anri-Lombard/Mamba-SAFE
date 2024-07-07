@@ -17,7 +17,7 @@ from rdkit.Chem import Atom, EditableMol
 from rdkit.Chem.rdChemReactions import ReactionFromSmarts
 from rdkit.Chem.rdmolops import AdjustQueryParameters, AdjustQueryProperties, ReplaceCore
 
-import safe as sf
+import safe_local as sf
 
 __implicit_carbon_query = dm.from_smarts("[#6;h]")
 __mmpa_query = dm.from_smarts("[*;!$(*=,#[!#6])]!@!=!#[*]")

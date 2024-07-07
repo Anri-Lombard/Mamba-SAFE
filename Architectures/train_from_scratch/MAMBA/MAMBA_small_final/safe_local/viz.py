@@ -4,7 +4,7 @@ from typing import Any, Optional, Tuple, Union
 import datamol as dm
 import matplotlib.pyplot as plt
 
-import safe as sf
+import safe_local as sf
 
 
 def to_image(
