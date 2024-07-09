@@ -1,11 +1,9 @@
 import math
 import os
-
 import sys
 import uuid
 from dataclasses import dataclass, field
 from typing import Literal, Optional
-import json
 
 import datasets
 import evaluate
@@ -16,43 +14,26 @@ from transformers import AutoConfig, AutoTokenizer, TrainingArguments, set_seed
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils.logging import log_levels as LOG_LEVELS
 
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.insert(0, parent_dir)
 
-print("Current working directory:", os.getcwd())
-print("Python path:", sys.path)
-
-try:
-    import safe_local
-    print("Successfully imported safe_local")
-except ImportError as e:
-    print(f"Failed to import safe_local: {e}")
-    print("Contents of parent directory:")
-    print(os.listdir(parent_dir))
-
+import safe_local
 from safe_local.tokenizer import SAFETokenizer
 from safe_local.trainer.collator import SAFECollator
 from safe_local.trainer.data_utils import get_dataset
 from safe_local.trainer.model import SAFEDoubleHeadsModel
 from safe_local.trainer.trainer_utils import SAFETrainer
 
-from mamba_model import MAMBAConfig, MAMBADoubleHeadsModel
-
 CURRENT_DIR = os.path.join(safe_local.__path__[0], "trainer")
 
 
 @dataclass
 class ModelArguments:
-    model_type: str = field(
-        default="safe",
-        metadata={"help": "Type of model to use. Choose between 'safe' and 'mamba'"},
-    )
     model_path: str = field(
         default=None,
-        metadata={
-            "help": "Optional model path or model name to use as a starting point for the safe model"
-        },
+        metadata={"help": "Optional model path or model name to use as a starting point for the safe model"},
     )
     config: Optional[str] = field(
         default=None, metadata={"help": "Path to the default config file to use for the safe model"}
@@ -64,16 +45,12 @@ class ModelArguments:
             metadata={"help": "Path to the trained tokenizer to use to build a safe model"},
         ),
     )
-    num_labels: Optional[int] = field(
-        default=None, metadata={"help": "Optional number of labels for the descriptors"}
-    )
+    num_labels: Optional[int] = field(default=None, metadata={"help": "Optional number of labels for the descriptors"})
     include_descriptors: Optional[bool] = field(
         default=True,
         metadata={"help": "Whether to train with descriptors if they are available or Not"},
     )
-    prop_loss_coeff: Optional[float] = field(
-        default=1e-2, metadata={"help": "coefficient for the propery loss"}
-    )
+    prop_loss_coeff: Optional[float] = field(default=1e-2, metadata={"help": "coefficient for the propery loss"})
     model_hub_name: Optional[str] = field(
         default="maclandrol/safe-gpt2",
         metadata={"help": "Name of the model when uploading to huggingface"},
@@ -129,13 +106,9 @@ class DataArguments:
         metadata={"help": "whether the dataset submitted as input is already tokenized or not"},
     )
 
-    streaming: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to use a streaming dataset or not"}
-    )
+    streaming: Optional[bool] = field(default=False, metadata={"help": "Whether to use a streaming dataset or not"})
 
-    text_column: Optional[str] = field(
-        default="inputs", metadata={"help": "Column containing text data to process."}
-    )
+    text_column: Optional[str] = field(default="inputs", metadata={"help": "Column containing text data to process."})
 
     max_train_samples: Optional[int] = field(
         default=None, metadata={"help": "Maximum number of training sample to use."}
@@ -154,9 +127,7 @@ class DataArguments:
 
     property_column: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "Column containing the descriptors information. Default to None to use `mc_labels`"
-        },
+        metadata={"help": "Column containing the descriptors information. Default to None to use `mc_labels`"},
     )
 
 
@@ -187,11 +158,7 @@ def train(model_args, data_args, training_args):
 
     # Detecting last checkpoint.
     last_checkpoint = None
-    if (
-        os.path.isdir(training_args.output_dir)
-        and training_args.do_train
-        and not training_args.overwrite_output_dir
-    ):
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
         if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
             logger.info(
@@ -247,9 +214,7 @@ def train(model_args, data_args, training_args):
 
     train_dataset = dataset["train"]
     if data_args.train_split is not None:
-        train_dataset = datasets.concatenate_datasets(
-            [dataset[x] for x in data_args.train_split.split("+")]
-        )
+        train_dataset = datasets.concatenate_datasets([dataset[x] for x in data_args.train_split.split("+")])
         if eval_dataset_key_name in data_args.train_split.split("+"):
             eval_dataset_key_name = None
 
@@ -259,32 +224,16 @@ def train(model_args, data_args, training_args):
         max_length=model_args.model_max_length,
         include_descriptors=model_args.include_descriptors,
         property_key="mc_labels",
-        model_type=model_args.model_type,
     )
     pretrained_tokenizer = data_collator.get_tokenizer()
     config = model_args.config
 
     if config is None:
         config = os.path.join(CURRENT_DIR, "configs/default_config.json")
+    config = AutoConfig.from_pretrained(config, cache_dir=model_args.cache_dir)
 
-    if model_args.model_type == "safe":
-        config = AutoConfig.from_pretrained(config, cache_dir=model_args.cache_dir)
-
-        if model_args.num_labels is not None:
-            config.num_labels = int(model_args.num_labels)
-
-        model_class = SAFEDoubleHeadsModel
-    elif model_args.model_type == "mamba":
-        # Load the config file
-        with open(model_args.config, 'r') as f:
-            config_dict = json.load(f)
-
-        # Initialize MAMBAConfig with the loaded dictionary
-        config = MAMBAConfig(**config_dict)
-
-        model_class = MAMBADoubleHeadsModel
-    else:
-        raise ValueError(f"Unknown model type {model_args.model_type}")
+    if model_args.num_labels is not None:
+        config.num_labels = int(model_args.num_labels)
 
     config.vocab_size = len(tokenizer)
     if model_args.model_max_length is not None:
@@ -304,7 +253,7 @@ def train(model_args, data_args, training_args):
             if model_args.torch_dtype in ["auto", None]
             else getattr(torch, model_args.torch_dtype)
         )
-        model = model_class.from_pretrained(
+        model = SAFEDoubleHeadsModel.from_pretrained(
             model_args.model_path,
             config=config,
             cache_dir=model_args.cache_dir,
@@ -313,19 +262,13 @@ def train(model_args, data_args, training_args):
         )
 
     else:
-        model = model_class(config)
-
-    # Technically not needed, but it's currently in the config and we need to set it
-    if model_args.model_type == "mamba":
-        model.tokenizer = tokenizer
+        model = SAFEDoubleHeadsModel(config)
 
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
-
-    # TODO: not needed?
-    # embedding_size = model.get_input_embeddings().num_embeddings
-    # if len(tokenizer) > embedding_size:
-    #     model.resize_token_embeddings(len(tokenizer))
+    embedding_size = model.get_input_embeddings().weight.shape[0]
+    if len(tokenizer) > embedding_size:
+        model.resize_token_embeddings(len(tokenizer))
 
     n_params = sum({p.data_ptr(): p.numel() for p in model.parameters()}.values())
     logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
@@ -367,9 +310,7 @@ def train(model_args, data_args, training_args):
         preds = preds[:, :-1].reshape(-1)
         results = accuracy_metric.compute(predictions=preds, references=labels)
         if mc_preds is not None and mc_labels is not None:
-            results_mse = mse_metric.compute(
-                predictions=mc_preds.reshape(-1), references=mc_labels.reshape(-1)
-            )
+            results_mse = mse_metric.compute(predictions=mc_preds.reshape(-1), references=mc_labels.reshape(-1))
             results.update(results_mse)
         return results
 
@@ -381,16 +322,14 @@ def train(model_args, data_args, training_args):
 
     trainer = SAFETrainer(
         model=model,
-        tokenizer=tokenizer,  # we don't deal with the tokenizer at all, https://github.com/huggingface/tokenizers/issues/581 -_-
+        tokenizer=None,  # we don't deal with the tokenizer at all, https://github.com/huggingface/tokenizers/issues/581 -_-
         train_dataset=train_dataset.shuffle(seed=(training_args.seed or 42)),
         eval_dataset=dataset.get(eval_dataset_key_name, None),
         args=training_args,
         prop_loss_coeff=model_args.prop_loss_coeff,
         compute_metrics=compute_metrics if training_args.do_eval else None,
         data_collator=data_collator,
-        preprocess_logits_for_metrics=(
-            preprocess_logits_for_metrics if training_args.do_eval else None
-        ),
+        preprocess_logits_for_metrics=(preprocess_logits_for_metrics if training_args.do_eval else None),
     )
 
     if training_args.do_train:

@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:ampere:1
 #SBATCH --time=48:00:00
-#SBATCH --job-name="MAMBA_small_evaluate"
+#SBATCH --job-name="MAMBA_large_evaluate"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
 #SBATCH --mail-type=ALL
 
@@ -19,9 +19,9 @@ module load python/miniconda3-py310 compilers/gcc11.2
 # Activate virtual environment
 source activate architecture_venv
 
-model_dir="/scratch/lmbanr001/MAMBA_small"
-tokenizer_path="/scratch/lmbanr001/MAMBA_small/tokenizer.json"
-output_dir="/scratch/lmbanr001/MAMBA_small"
+model_dir="/scratch/lmbanr001/MAMBA_large"
+tokenizer_path="/scratch/lmbanr001/MAMBA_large/tokenizer.json"
+output_dir="/scratch/lmbanr001/MAMBA_large"
 
 export TOKENIZERS_PARALLELISM="false"
 

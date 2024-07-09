@@ -28,7 +28,6 @@ class SAFECollator:
         property_key: str = "descriptors",
         include_descriptors: bool = False,
         max_length: Optional[int] = None,
-        model_type: str = "safe",
     ):
         """
         Default collator for huggingface transformers in izanagi.
@@ -49,7 +48,6 @@ class SAFECollator:
         self.property_key = property_key
         self.include_descriptors = include_descriptors
         self.max_length = max_length
-        self.model_type = model_type
 
     @functools.lru_cache()
     def get_tokenizer(self):
@@ -109,18 +107,4 @@ class SAFECollator:
                     # "input_text": inputs,
                 }
             )
-
-        batch.pop("token_type_ids", None)
-
-        # Not yet sure if this is going to work
-        if self.model_type == "mamba":
-            # Mamba doesn't use attention mask, so we remove it
-            batch.pop("attention_mask", None)
-            # Add position_ids if not present
-            # TODO: experiment with removing positional ids
-            # if "position_ids" not in batch:
-            #     batch["position_ids"] = torch.arange(batch["input_ids"].shape[1], dtype=torch.long).unsqueeze(0).expand(batch["input_ids"].shape)
-            batch.pop("position_ids", None)
-
-        # Clone all tensors to ensure they don't share memory
-        return {k: v.clone() if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+        return batch

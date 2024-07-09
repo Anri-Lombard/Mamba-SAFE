@@ -1,6 +1,6 @@
 {
   "d_model": 768,
-  "n_layer": 5,
+  "n_layer": 12,
   "d_intermediate": 12,
   "num_hidden_layers": 12,
   "hidden_act": "silu",
