@@ -3,7 +3,7 @@
 #SBATCH --partition=a100
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gres=gpu:ampere:1
+#SBATCH --gres=gpu:ampere80:1
 #SBATCH --time=48:00:00
 #SBATCH --job-name="MAMBA_large"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
@@ -70,7 +70,7 @@ python3 trainer/cli.py \
     --model_type "mamba" \
     --optim "adamw_torch" \
     --learning_rate 1e-6 \
-    --per_device_train_batch_size 100 \
+    --per_device_train_batch_size 64 \
     --gradient_accumulation_steps 2 \
     --warmup_steps 5000 \
     --eval_steps 500 \
