@@ -50,6 +50,9 @@ else
   mkdir -p "$TMPDIR"
 fi
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
+
 # Load necessary modules
 module load python/miniconda3-py310
 
@@ -58,15 +61,17 @@ source activate architecture_venv
 
 pip3 install --force-reinstall --no-deps wandb==0.17.3
 
-config_path="../trainer/configs/large_config.json"
-tokenizer_path="../tokenizer.json"
+config_path="trainer/configs/large_config.json"
+tokenizer_path="tokenizer.json"
 dataset_path="anrilombard/safe-gpt-small"
 output_dir="/scratch/lmbanr001/SAFE_large"
+output_dir="lmbanr001/SAFE_large"
 
 mkdir -p $output_dir
 mkdir -p $wandb_cache_dir
 
-safe-train --config $config_path \
+python3 trainer/cli.py \
+  --config $config_path \
   --tokenizer $tokenizer_path \
   --dataset $dataset_path \
   --text_column "input" \
