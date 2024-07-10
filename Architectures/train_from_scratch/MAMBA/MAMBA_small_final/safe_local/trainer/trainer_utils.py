@@ -1,11 +1,11 @@
-from transformers import Trainer
+from transformers import Trainer, get_scheduler
 from transformers.modeling_utils import unwrap_model
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 
 import torch
 import os
 
-from typing import Optional
+from typing import Optional, Dict, Any, Union
 
 class SAFETrainer(Trainer):
     """
@@ -56,6 +56,68 @@ class SAFETrainer(Trainer):
             loss = loss + self.prop_loss_coeff * mc_loss
         return (loss, outputs) if return_outputs else loss
 
+    def create_optimizer_and_scheduler(self, num_training_steps: int):
+        """
+        Setup the optimizer and the learning rate scheduler.
+        """
+        if self.optimizer is None:
+            no_decay = ["bias", "LayerNorm.weight"]
+            optimizer_grouped_parameters = [
+                {
+                    "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
+                    "weight_decay": self.args.weight_decay,
+                },
+                {
+                    "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
+                    "weight_decay": 0.0,
+                },
+            ]
+            self.optimizer = torch.optim.AdamW(
+                optimizer_grouped_parameters,
+                lr=self.args.learning_rate,
+                betas=(self.args.adam_beta1, self.args.adam_beta2),
+                eps=self.args.adam_epsilon,
+            )
+
+        if self.lr_scheduler is None:
+            self.lr_scheduler = get_scheduler(
+                self.args.lr_scheduler_type,
+                self.optimizer,
+                num_warmup_steps=self.args.warmup_steps,
+                num_training_steps=num_training_steps,
+            )
+
+    def training_step(self, model: torch.nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
+        model.train()
+        inputs = self._prepare_inputs(inputs)
+
+        with self.autocast_smart_context_manager():
+            loss = self.compute_loss(model, inputs)
+
+        if self.args.gradient_accumulation_steps > 1:
+            loss = loss / self.args.gradient_accumulation_steps
+
+        loss.backward()
+
+        if self.args.max_grad_norm is not None and self.args.max_grad_norm > 0:
+            self.clip_gradients(model, self.args.max_grad_norm)
+
+        return loss.detach()
+
+    def clip_gradients(self, model, max_grad_norm):
+        if hasattr(self.optimizer, "clip_grad_norm"):
+            # Some optimizers (like the sharded optimizer) have a specific way to do gradient clipping
+            self.optimizer.clip_grad_norm(max_grad_norm)
+        elif hasattr(model, "clip_grad_norm_"):
+            # Some models (like FullyShardedDDP) have a specific way to do gradient clipping
+            model.clip_grad_norm_(max_grad_norm)
+        else:
+            # Revert to normal clipping otherwise, handling both nn.DataParallel and non-parallel
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(),
+                max_grad_norm,
+            )
+
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -75,3 +137,36 @@ class SAFETrainer(Trainer):
         # Save the config
         if hasattr(self.model, 'config'):
             self.model.config.save_pretrained(output_dir)
+
+    def get_train_dataloader(self):
+        if self.train_dataset is None:
+            raise ValueError("Trainer: training requires a train_dataset.")
+
+        train_dataset = self.train_dataset
+        data_collator = self.data_collator
+
+        dataloader_params = {
+            "batch_size": self.args.per_device_train_batch_size,
+            "collate_fn": data_collator,
+            "num_workers": self.args.dataloader_num_workers,
+            "pin_memory": self.args.dataloader_pin_memory,
+        }
+
+        if not isinstance(train_dataset, torch.utils.data.IterableDataset):
+            dataloader_params["sampler"] = self._get_train_sampler()
+            dataloader_params["drop_last"] = self.args.dataloader_drop_last
+
+        return self.accelerator.prepare(torch.utils.data.DataLoader(train_dataset, **dataloader_params))
+
+    def log(self, logs: Dict[str, float]) -> None:
+        if self.state.epoch is not None:
+            logs["epoch"] = round(self.state.epoch, 2)
+
+        output = {**logs, **{"step": self.state.global_step}}
+        self.state.log_history.append(output)
+        self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs)
+
+    def on_save(self, args, state, control, **kwargs):
+        if state.is_world_process_zero:
+            self._save(self.args.output_dir)
+        return control
