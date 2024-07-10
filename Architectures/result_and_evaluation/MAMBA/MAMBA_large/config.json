@@ -4,7 +4,7 @@
   "bos_token_id": 1,
   "d_intermediate": 12,
   "d_model": 768,
-  "dropout_rate": 0.3,
+  "dropout_rate": 0.2,
   "eos_token_id": 2,
   "fused_add_norm": true,
   "hidden_act": "silu",

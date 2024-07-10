@@ -69,15 +69,15 @@ python3 trainer/cli.py \
     --streaming True \
     --model_type "mamba" \
     --optim "adamw_torch" \
-    --learning_rate 5e-5 \
-    --per_device_train_batch_size 32 \
-    --gradient_accumulation_steps 4 \
-    --warmup_steps 2000 \
+    --learning_rate 1e-7 \
+    --per_device_train_batch_size 64 \
+    --gradient_accumulation_steps 2 \
+    --warmup_steps 10000 \
     --eval_steps 500 \
     --save_steps 500 \
-    --num_train_epochs 10 \
+    --num_train_epochs 100 \
     --save_total_limit 1 \
-    --prop_loss_coeff 1e-2 \
+    --prop_loss_coeff 1e-3 \
     --output_dir $output_dir \
     --overwrite_output_dir True \
     --do_train True \
@@ -87,8 +87,8 @@ python3 trainer/cli.py \
     --save_safetensors True \
     --gradient_checkpointing True \
     --eval_accumulation_steps 100 \
-    --max_grad_norm 1.0 \
-    --weight_decay 0.01 \
+    --max_grad_norm 2.0 \
+    --weight_decay 0.001 \
     --max_steps 50_000 \
 
 # Deactivate virtual environment

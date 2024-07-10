@@ -5,7 +5,7 @@
   "num_hidden_layers": 12,
   "hidden_act": "silu",
   "ssm_cfg": {},
-  "dropout_rate": 0.3,
+  "dropout_rate": 0.1,
   "rms_norm": true,
   "residual_in_fp32": true,
   "vocab_size": 1880,
