@@ -64,8 +64,6 @@ output_dir="/scratch/lmbanr001/SAFE_small"
 mkdir -p $output_dir
 mkdir -p $wandb_cache_dir
 
-# 40 epochs since we are using 1 A100 where
-# where they used 4 A100s for 10 epochs
 safe-train --config $config_path \
   --tokenizer $tokenizer_path \
   --dataset $dataset_path \

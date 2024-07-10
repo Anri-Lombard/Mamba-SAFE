@@ -69,7 +69,7 @@ python3 trainer/cli.py \
     --streaming True \
     --model_type "mamba" \
     --optim "adamw_torch" \
-    --learning_rate 1e-7 \
+    --learning_rate 1e-9 \
     --per_device_train_batch_size 64 \
     --gradient_accumulation_steps 2 \
     --warmup_steps 10000 \
