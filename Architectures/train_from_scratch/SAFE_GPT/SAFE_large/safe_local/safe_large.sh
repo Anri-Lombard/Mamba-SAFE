@@ -3,7 +3,7 @@
 #SBATCH --partition=a100
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gres=gpu:ampere:1
+#SBATCH --gres=gpu:ampere80:1
 #SBATCH --time=48:00:00
 #SBATCH --job-name="SAFE_large"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za

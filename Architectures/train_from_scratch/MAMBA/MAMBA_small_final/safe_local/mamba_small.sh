@@ -3,7 +3,7 @@
 #SBATCH --partition=a100
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gres=gpu:ampere:1
+#SBATCH --gres=gpu:ampere80:1
 #SBATCH --time=48:00:00
 #SBATCH --job-name="MAMBA_small"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
@@ -49,6 +49,8 @@ module load python/miniconda3-py310 compilers/gcc11.2
 # Activate virtual environment
 source activate architecture_venv
 
+pip3 install --force-reinstall --no-deps wandb==0.17.0 protobuf==4.25.3
+
 # Set up paths
 config_path="mamba_config.json"
 tokenizer_path="tokenizer.json"
@@ -82,9 +84,9 @@ python3 trainer/cli.py \
     --save_safetensors True \
     --gradient_checkpointing True \
     --eval_accumulation_steps 100 \
-    --max_grad_norm 1.0 \
+    --max_grad_norm 2.0 \
     --weight_decay 0.01 \
-    --max_steps 12_500 \
+    --max_steps 12_500
 
 # Deactivate virtual environment
 conda deactivate
