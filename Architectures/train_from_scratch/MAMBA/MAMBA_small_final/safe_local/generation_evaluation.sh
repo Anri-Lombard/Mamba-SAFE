@@ -3,9 +3,9 @@
 #SBATCH --partition=a100
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gres=gpu:ampere:1
+#SBATCH --gres=gpu:ampere80:1
 #SBATCH --time=48:00:00
-#SBATCH --job-name="MAMBA_small_evaluate"
+#SBATCH --job-name="MAMBA_small_generate"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
 #SBATCH --mail-type=ALL
 
@@ -21,13 +21,15 @@ source activate architecture_venv
 
 model_dir="/scratch/lmbanr001/MAMBA_small"
 tokenizer_path="/scratch/lmbanr001/MAMBA_small/tokenizer.json"
-output_dir="/scratch/lmbanr001/MAMBA_small"
 
 export TOKENIZERS_PARALLELISM="false"
 
-python3 evaluate_mamba_small.py --model_dir $model_dir \
+python3 simplified_molecule_generator.py --model_dir $model_dir \
     --tokenizer_path $tokenizer_path \
     --num_samples 100 \
-    --max_length 100
+    --max_length 100 \
+    --top_k 50 \
+    --top_p 0.9 \
+    --temperature 0.7
 
 conda deactivate

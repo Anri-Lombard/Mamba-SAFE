@@ -26,6 +26,8 @@ from safe_local.trainer.data_utils import get_dataset
 from safe_local.trainer.model import SAFEDoubleHeadsModel
 from safe_local.trainer.trainer_utils import SAFETrainer
 
+from callbacks import PerplexityCallback
+
 CURRENT_DIR = os.path.join(safe_local.__path__[0], "trainer")
 
 
@@ -319,6 +321,7 @@ def train(model_args, data_args, training_args):
 
     # update dispatch_batches in accelerator
     training_args.accelerator_config.dispatch_batches = data_args.streaming is not True
+    training_args.max_grad_norm = 1.0 # Default
 
     trainer = SAFETrainer(
         model=model,
@@ -332,6 +335,9 @@ def train(model_args, data_args, training_args):
         preprocess_logits_for_metrics=(preprocess_logits_for_metrics if training_args.do_eval else None),
     )
 
+    perplexity_callback = PerplexityCallback(eval_steps=1000)  # Calculate perplexity every 1000 steps
+    trainer.add_callback(perplexity_callback)
+    
     if training_args.do_train:
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:

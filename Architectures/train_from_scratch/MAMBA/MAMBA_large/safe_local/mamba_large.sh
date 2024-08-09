@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:ampere80:1
 #SBATCH --time=48:00:00
-#SBATCH --job-name="MAMBA_large"
+#SBATCH --job-name="MAMBA_large_v10"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
 #SBATCH --mail-type=ALL
 
@@ -49,13 +49,18 @@ module load python/miniconda3-py310 compilers/gcc11.2
 # Activate virtual environment
 source activate architecture_venv
 
-pip3 install --force-reinstall --no-deps wandb==0.16.6 protobuf==4.25.3
+# pip3 install --force-reinstall --no-deps wandb==0.17.4 protobuf==4.25.3
 
 # Set up paths
 config_path="mamba_config.json"
 tokenizer_path="tokenizer.json"
-dataset_path="anrilombard/safe-gpt-small"
-output_dir="/scratch/lmbanr001/MAMBA_large"
+dataset_path="sagawa/ZINC-canonicalized"
+output_dir="/scratch/lmbanr001/MAMBA_large_v10"
+
+# Clear the output directory if it exists
+if [ -d "$output_dir" ]; then
+    rm -rf "$output_dir"/*
+fi
 
 mkdir -p $output_dir
 
@@ -64,31 +69,31 @@ python3 trainer/cli.py \
     --config $config_path \
     --tokenizer $tokenizer_path \
     --dataset $dataset_path \
-    --text_column "input" \
+    --text_column "smiles" \
     --is_tokenized False \
     --streaming True \
     --model_type "mamba" \
     --optim "adamw_torch" \
-    --learning_rate 1e-9 \
+    --learning_rate 6e-4 \
     --per_device_train_batch_size 64 \
     --gradient_accumulation_steps 2 \
-    --warmup_steps 10000 \
+    --warmup_steps 2000 \
     --eval_steps 500 \
     --save_steps 500 \
+    --logging_steps 100 \
+    --logging_first_step True \
     --num_train_epochs 100 \
-    --save_total_limit 1 \
+    --save_total_limit 2 \
     --prop_loss_coeff 1e-3 \
     --output_dir $output_dir \
     --overwrite_output_dir True \
     --do_train True \
-    --push_to_hub True \
-    --hub_token "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" \
-    --hub_model_id "anrilombard/mamba-medium" \
+    --do_eval True \
     --save_safetensors True \
     --gradient_checkpointing True \
     --eval_accumulation_steps 100 \
-    --max_grad_norm 2.0 \
-    --weight_decay 0.001 \
+    --max_grad_norm 1.0 \
+    --weight_decay 0.1 \
     --max_steps 50_000 \
 
 # Deactivate virtual environment

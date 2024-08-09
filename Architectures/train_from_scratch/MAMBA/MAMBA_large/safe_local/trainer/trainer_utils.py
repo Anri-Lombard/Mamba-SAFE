@@ -5,6 +5,8 @@ from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_N
 import torch
 import os
 
+from collections import namedtuple
+
 from typing import Optional, Dict, Any, Union
 
 class SAFETrainer(Trainer):
@@ -29,31 +31,40 @@ class SAFETrainer(Trainer):
 
         outputs = model(**inputs)
 
-        if len(outputs) == 4:  # For MAMBADoubleHeadsModel
-            lm_loss, mc_loss, lm_logits, mc_logits = outputs
-        else:  # For SAFEDoubleHeadsModel
-            lm_loss, mc_loss = outputs[:2]
-        # Save past state if it exists
-        # TODO: this needs to be fixed and made cleaner later.
-        if self.args.past_index >= 0:
-            self._past = outputs[self.args.past_index]
-
-        if labels is not None:
-            if unwrap_model(model)._get_name() in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
-                loss = self.label_smoother(outputs, labels, shift_labels=True)
+        if isinstance(outputs, tuple) and hasattr(outputs, '_fields'):  # For Mamba and newer SAFE models
+            lm_loss = getattr(outputs, 'loss', None) or getattr(outputs, 'lm_loss', None)
+            mc_loss = getattr(outputs, 'mc_loss', None)
+            lm_logits = getattr(outputs, 'logits', None)
+            mc_logits = getattr(outputs, 'mc_logits', None)
+        elif isinstance(outputs, (tuple, list)):  # For older SAFE models
+            if len(outputs) >= 2:
+                lm_loss, mc_loss = outputs[:2]
+                lm_logits = outputs[2] if len(outputs) > 2 else None
+                mc_logits = outputs[3] if len(outputs) > 3 else None
             else:
-                loss = self.label_smoother(outputs, labels)
+                raise ValueError(f"Unexpected number of outputs: {len(outputs)}")
+        elif isinstance(outputs, Dict):  # For models returning dictionaries
+            lm_loss = outputs.get('loss') or outputs.get('lm_loss')
+            mc_loss = outputs.get('mc_loss')
+            lm_logits = outputs.get('logits')
+            mc_logits = outputs.get('mc_logits')
         else:
-            if isinstance(outputs, dict) and "loss" not in outputs:
-                raise ValueError(
-                    "The model did not return a loss from the inputs, only the following keys: "
-                    f"{','.join(outputs.keys())}. For reference, the inputs it received are {','.join(inputs.keys())}."
-                )
-            # We don't use .loss here since the model may return tuples instead of ModelOutput.
-            loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-        mc_loss = outputs.get("mc_loss", None) if isinstance(outputs, dict) else outputs[1]
+            raise ValueError(f"Unexpected output type: {type(outputs)}")
+        
+        # Ensure we have the necessary outputs
+        if lm_loss is None and lm_logits is None:
+            raise ValueError("Model output must contain either 'loss'/'lm_loss' or 'logits'/'lm_logits'")
+
+        # Compute language modeling loss if not provided
+        if lm_loss is None and labels is not None:
+            loss_fct = torch.nn.CrossEntropyLoss()
+            lm_loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
+
+        # Combine losses
+        loss = lm_loss
         if mc_loss is not None:
             loss = loss + self.prop_loss_coeff * mc_loss
+
         return (loss, outputs) if return_outputs else loss
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
@@ -103,6 +114,15 @@ class SAFETrainer(Trainer):
             self.clip_gradients(model, self.args.max_grad_norm)
 
         return loss.detach()
+
+    def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix="eval"):
+        # Call the parent's evaluate method
+        metrics = super().evaluate(eval_dataset, ignore_keys, metric_key_prefix)
+
+        # Explicitly log all evaluation metrics
+        self.log({f"{metric_key_prefix}_{k}": v for k, v in metrics.items()})
+
+        return metrics
 
     def clip_gradients(self, model, max_grad_norm):
         if hasattr(self.optimizer, "clip_grad_norm"):
@@ -159,6 +179,15 @@ class SAFETrainer(Trainer):
         return self.accelerator.prepare(torch.utils.data.DataLoader(train_dataset, **dataloader_params))
 
     def log(self, logs: Dict[str, float]) -> None:
+        """
+        Log `logs` on the various objects watching training.
+
+        Subclass and override this method to inject custom behavior.
+
+        Args:
+            logs (`Dict[str, float]`):
+                The values to log.
+        """
         if self.state.epoch is not None:
             logs["epoch"] = round(self.state.epoch, 2)
 
@@ -170,3 +199,29 @@ class SAFETrainer(Trainer):
         if state.is_world_process_zero:
             self._save(self.args.output_dir)
         return control
+
+    # def _maybe_log_save_evaluate(self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval):
+    #     if self.control.should_log:
+    #         logs: Dict[str, float] = {}
+    #         tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+    #         # reset tr_loss to zero
+    #         tr_loss -= tr_loss
+
+    #         logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
+    #         logs["learning_rate"] = self._get_learning_rate()
+
+    #         self._total_loss_scalar += tr_loss_scalar
+    #         self._globalstep_last_logged = self.state.global_step
+
+    #         self.log(logs)
+
+    #     metrics = None
+    #     if self.control.should_evaluate:
+    #         metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
+    #         self._report_to_hp_search(trial, self.state.global_step, metrics)
+
+    #     if self.control.should_save:
+    #         self._save_checkpoint(model, trial, metrics=metrics)
+    #         self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+
+    #     return metrics

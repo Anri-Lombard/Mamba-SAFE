@@ -1,7 +1,7 @@
 from transformers import Trainer
 from transformers.modeling_utils import unwrap_model
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
-
+import torch
 
 class SAFETrainer(Trainer):
     """
@@ -19,7 +19,9 @@ class SAFETrainer(Trainer):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
         """
-        labels = inputs.pop("labels") if self.label_smoother is not None and "labels" in inputs else None
+        labels = (
+            inputs.pop("labels") if self.label_smoother is not None and "labels" in inputs else None
+        )
 
         outputs = model(**inputs)
         # Save past state if it exists
@@ -44,3 +46,34 @@ class SAFETrainer(Trainer):
         if mc_loss is not None:
             loss = loss + self.prop_loss_coeff * mc_loss
         return (loss, outputs) if return_outputs else loss
+
+    def training_step(self, model: torch.nn.Module, inputs: dict[str, torch.Tensor]) -> torch.Tensor:
+        model.train()
+        inputs = self._prepare_inputs(inputs)
+
+        with self.autocast_smart_context_manager():
+            loss = self.compute_loss(model, inputs)
+
+        if self.args.gradient_accumulation_steps > 1:
+            loss = loss / self.args.gradient_accumulation_steps
+
+        loss.backward()
+
+        if self.args.max_grad_norm is not None and self.args.max_grad_norm > 0:
+            self.clip_gradients(model, self.args.max_grad_norm)
+
+        return loss.detach()
+
+    def clip_gradients(self, model, max_grad_norm):
+        if hasattr(self.optimizer, "clip_grad_norm"):
+            # Some optimizers (like the sharded optimizer) have a specific way to do gradient clipping
+            self.optimizer.clip_grad_norm(max_grad_norm)
+        elif hasattr(model, "clip_grad_norm_"):
+            # Some models (like FullyShardedDDP) have a specific way to do gradient clipping
+            model.clip_grad_norm_(max_grad_norm)
+        else:
+            # Revert to normal clipping otherwise, handling both nn.DataParallel and non-parallel
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(),
+                max_grad_norm,
+            )

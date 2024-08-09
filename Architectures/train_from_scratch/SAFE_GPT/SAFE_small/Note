@@ -1,1 +1,0 @@
-We need to keep accelerate less than version 0.28.0 to train SAFE since there is some s_batches bug.

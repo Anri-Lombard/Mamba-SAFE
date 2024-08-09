@@ -31,15 +31,15 @@ More information needed
 ### Training hyperparameters
 
 The following hyperparameters were used during training:
-- learning_rate: 5e-05
-- train_batch_size: 32
+- learning_rate: 1e-06
+- train_batch_size: 64
 - eval_batch_size: 8
 - seed: 42
-- gradient_accumulation_steps: 4
+- gradient_accumulation_steps: 2
 - total_train_batch_size: 128
 - optimizer: Adam with betas=(0.9,0.999) and epsilon=1e-08
 - lr_scheduler_type: linear
-- lr_scheduler_warmup_steps: 2000
+- lr_scheduler_warmup_steps: 10000
 - training_steps: 50000
 
 ### Training results

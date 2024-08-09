@@ -1,0 +1,13 @@
+Loading python/miniconda3-py310
+  Loading requirement: compilers/gcc820 mpi/openmpi-4.0.1
+Loading existing dataset...
+Traceback (most recent call last):
+  File "/home/lmbanr001/hons2024/Datasets/continue_validation_split.py", line 32, in <module>
+    existing_dataset = datasets.load_from_disk("tokenized_zinc_dataset")
+  File "/home/lmbanr001/.local/lib/python3.10/site-packages/datasets/load.py", line 2702, in load_from_disk
+    return DatasetDict.load_from_disk(dataset_path, keep_in_memory=keep_in_memory, storage_options=storage_options)
+  File "/home/lmbanr001/.local/lib/python3.10/site-packages/datasets/dataset_dict.py", line 1378, in load_from_disk
+    dataset_dict[k] = Dataset.load_from_disk(
+  File "/home/lmbanr001/.local/lib/python3.10/site-packages/datasets/arrow_dataset.py", line 1725, in load_from_disk
+    raise FileNotFoundError(
+FileNotFoundError: No such files: '/home/lmbanr001/hons2024/Datasets/tokenized_zinc_dataset/train/dataset_info.json', nor '/home/lmbanr001/hons2024/Datasets/tokenized_zinc_dataset/train/state.json' found. Expected to load a `Dataset` object but provided path is not a `Dataset`.
