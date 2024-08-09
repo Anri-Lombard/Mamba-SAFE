@@ -26,6 +26,8 @@ We used the foundational SAFE code, but switched out the model logic to rather u
 1. Our 20M model lives [here](./Architectures/train_from_scratch/MAMBA/MAMBA_small_final/safe_local/) (the bash script). The model we built can be found in the [mamba_model script](./Architectures/train_from_scratch/MAMBA/MAMBA_small_final/safe_local/trainer/mamba_model.py). We build the model based on the [LLM Head](./Architectures/train_from_scratch/MAMBA/MAMBA_small_final/safe_local/trainer/mixer_seq_simple.py) model by the MAMBA authors. The main training logic is inside [cli.py](./Architectures/train_from_scratch/MAMBA/MAMBA_small_final/safe_local/trainer/cli.py) with the collator and trainer in the same directory. I implemented gradient clipping and weight decay as this did not seem to work out the box from the SAFE library (shown in the trainer_utils.py file) and altered the loss computation slightly to work with our MAMBA model.
 2. Our 50M model lives [here](./Architectures/train_from_scratch/MAMBA/MAMBA_large/safe_local/), and has the same code as the smaller model; the only change is parameters passed into cli.py from the bash script.
 
+For generation we use the [code provided by the authors](https://github.com/state-spaces/mamba/blob/main/mamba_ssm/utils/generation.py).
+
 ## Results and Evaluation
 
 As of this writing the large models are training, but the small SAFE model and MAMBA model have some [preliminary results](./Architectures/result_and_evaluation/).

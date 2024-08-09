@@ -3,14 +3,14 @@
 #SBATCH --partition=a100
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gres=gpu:ampere:1
+#SBATCH --gres=gpu:ampere80:1
 #SBATCH --time=48:00:00
-#SBATCH --job-name="SAFE_small"
+#SBATCH --job-name="SAFE_20M_validated_v2"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
 #SBATCH --mail-type=ALL
 
 # export WANDB_MODE="disabled"
-export WANDB_MODE="offline"
+# export WANDB_MODE="offline"
 export WANDB_API_KEY="d68cdf1a94da49b43fbfb7fd90246c39d7c34237"
 # Set the wandb cache and directory paths
 wandb_cache_dir="/scratch/lmbanr001/wandb_cache"
@@ -58,38 +58,46 @@ source activate architecture_venv
 
 config_path="../trainer/configs/small_config.json"
 tokenizer_path="../tokenizer.json"
-dataset_path="../../Datasets/MOSES/datasets"
-output_dir="/scratch/lmbanr001/SAFE_small"
+dataset_path="/scratch/lmbanr001/Datasets/MOSES/safe_datasets"
+# dataset_path="sagawa/ZINC-canonicalized"
+output_dir="/scratch/lmbanr001/SAFE_20M_validated_v2"
+# checkpoint_path="/scratch/lmbanr001/SAFE_20M_validated/checkpoint-213000"
+# config_path="/scratch/lmbanr001/SAFE_20M_validated/checkpoint-213000/config.json"
 
 mkdir -p $output_dir
 mkdir -p $wandb_cache_dir
 
-# 40 epochs since we are using 1 A100 where
-# where they used 4 A100s for 10 epochs
 safe-train --config $config_path \
   --tokenizer $tokenizer_path \
   --dataset $dataset_path \
-  --text_column "SMILES" \
-  --is_tokenized False \
-  --streaming True \
+  --text_column "SAFE" \
   --optim "adamw_torch" \
   --learning_rate 5e-4 \
   --per_device_train_batch_size 32 \
+  --per_device_eval_batch_size 32 \
   --gradient_accumulation_steps 2 \
-  --warmup_steps 2000 \
-  --eval_steps 500 \
-  --save_steps 500 \
+  --report_to "wandb" \
+  --warmup_steps 20000 \
+  --logging_first_step True \
+  --logging_steps 100 \
+  --eval_accumulation_steps 1000 \
+  --save_steps 1000 \
+  --eval_steps 1000 \
+  --eval_strategy "steps" \
+  --wandb_project "SAFE_small" \
   --num_train_epochs 10 \
   --save_total_limit 1 \
-  --prop_loss_coeff 1e-3 \
   --output_dir $output_dir \
   --overwrite_output_dir True \
   --do_train True \
   --do_eval True \
   --save_safetensors True \
   --gradient_checkpointing True \
-  --eval_accumulation_steps 100 \
-  --max_steps 125_000
+  --num_train_epochs 10 \
+  --prediction_loss_only True \
+  --max_grad_norm 1.0 \
+  --weight_decay 0.1 \
+  --include_descriptors False
 
 # Deactivate virtual environment
 conda deactivate

@@ -1,0 +1,1 @@
+- uninstall safe so we could use the namespace

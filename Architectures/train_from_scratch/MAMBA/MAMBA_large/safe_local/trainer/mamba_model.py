@@ -16,6 +16,10 @@ import os
 import json
 import copy
 
+MAMBADoubleHeadsOutput = namedtuple('MAMBADoubleHeadsOutput',
+    ['loss', 'lm_loss', 'mc_loss', 'logits', 'mc_logits', 'hidden_states']
+)
+
 class MAMBAConfig(MambaConfig):
     def __init__(self, **kwargs):
         # Filter out unexpected parameters
@@ -106,7 +110,7 @@ class MAMBADoubleHeadsModel(nn.Module, GenerationMixin):
         max_length,
         num_return_sequences=1,
         return_dict_in_generate=False,
-        output_scores=False,
+        output_scores=True,
         **kwargs
     ):
         # If no input_ids are provided, create a default input (start token)
@@ -142,9 +146,9 @@ class MAMBADoubleHeadsModel(nn.Module, GenerationMixin):
         if not output_scores:
             output.scores = None
 
-        return output if return_dict_in_generate else output.sequences
+        return output
 
-    def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
+    def allocate_inference_cache(self, batch_size, max_seqlen=100, dtype=None, **kwargs):
         return self.mamba.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
 
     # A lot of these arguments are not used, but are kept for compatibility with the Trainer
@@ -165,7 +169,7 @@ class MAMBADoubleHeadsModel(nn.Module, GenerationMixin):
         inputs: Optional[Any] = None, # the trainer might need these
         # encoder_hidden_states: Optional[torch.Tensor] = None, # TODO: needed?
         **kwargs
-    ):
+    ) -> MAMBADoubleHeadsOutput:
         # input_ids = input_ids.to(self.device)
 
         # TODO: might use later
@@ -204,21 +208,19 @@ class MAMBADoubleHeadsModel(nn.Module, GenerationMixin):
             loss_fct = nn.CrossEntropyLoss()
             lm_loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
 
+        loss = lm_loss if lm_loss is not None else torch.tensor(0.0, device=hidden_states.device)
+        if mc_loss is not None:
+            loss += mc_loss
 
-        GPT2DoubleHeadsModelOutput = namedtuple('GPT2DoubleHeadsModelOutput',
-            ['loss', 'mc_loss', 'logits', 'mc_logits', 'past_key_values', 'hidden_states', 'attentions']
-        )
-
-        return GPT2DoubleHeadsModelOutput(
-            loss=lm_loss,
+        return MAMBADoubleHeadsOutput(
+            loss=loss,
+            lm_loss=lm_loss,
             mc_loss=mc_loss,
             logits=lm_logits,
             mc_logits=mc_logits,
-            past_key_values=None, # MAMBA does not use attention, just for compatibility
-            hidden_states=hidden_states,
-            attentions=None, # MAMBA does not use attention, just for compatibility
+            hidden_states=hidden_states
         )
-    
+
     def gradient_checkpointing_enable(self, gradient_checkpointing_kwargs=None):
         self._gradient_checkpointing = True
         if hasattr(self.mamba.backbone, 'gradient_checkpointing_enable'):

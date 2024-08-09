@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:ampere80:1
 #SBATCH --time=48:00:00
-#SBATCH --job-name="SAFE_large"
+#SBATCH --job-name="SAFE_large_v8"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
 #SBATCH --mail-type=ALL
 
@@ -59,43 +59,48 @@ module load python/miniconda3-py310
 # Activate virtual environment
 source activate architecture_venv
 
-pip3 install --force-reinstall --no-deps wandb==0.17.3
+pip3 install --force-reinstall --no-deps wandb==0.17.3 safe-mol
 
 config_path="trainer/configs/large_config.json"
 tokenizer_path="tokenizer.json"
-dataset_path="anrilombard/safe-gpt-small"
-output_dir="/scratch/lmbanr001/SAFE_large"
-output_dir="lmbanr001/SAFE_large"
+dataset_path="sagawa/ZINC-canonicalized"
+output_dir="/scratch/lmbanr001/SAFE_large_v8"
+
+# Clear the output directory if it exists
+if [ -d "$output_dir" ]; then
+    rm -rf "$output_dir"/*
+fi
 
 mkdir -p $output_dir
 mkdir -p $wandb_cache_dir
 
-python3 trainer/cli.py \
-  --config $config_path \
+safe-train --config $config_path \
+  --model_max_length 512 \
   --tokenizer $tokenizer_path \
   --dataset $dataset_path \
-  --text_column "input" \
-  --is_tokenized False \
-  --streaming True \
+  --text_column "smiles" \
+  --is_tokenized True \
   --optim "adamw_torch" \
-  --learning_rate 1e-4 \
-  --per_device_train_batch_size 64 \
+  --learning_rate 3e-4 \
+  --per_device_train_batch_size 80 \
+  --eval_accumulation_steps 100 \
+  --per_device_eval_batch_size 32 \
   --gradient_accumulation_steps 2 \
   --warmup_steps 5000 \
-  --eval_steps 500 \
-  --save_steps 5000 \
-  --save_total_limit 1 \
+  --eval_steps 1000 \
+  --save_steps 500 \
+  --logging_steps 500 \
+  --logging_first_step True \
+  --evaluation_strategy steps \
+  --save_total_limit 2 \
   --prop_loss_coeff 1e-3 \
   --output_dir $output_dir \
   --overwrite_output_dir True \
   --do_train True \
   --do_eval True \
-  --push_to_hub True \
-  --hub_token "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" \
-  --hub_model_id "anrilombard/safe-gpt-medium" \
   --save_safetensors True \
   --gradient_checkpointing True \
-  --eval_accumulation_steps 1000 \
+  --eval_accumulation_steps 100 \
   --max_steps 500_000
 
 # Deactivate virtual environment

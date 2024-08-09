@@ -32,11 +32,12 @@ def generate_molecules(designer, n_samples=1000, max_length=100):
         n_samples_per_trial=n_samples,
         max_length=max_length,
         sanitize=True,
-        top_k=15,
-        top_p=0.9,
-        temperature=0.8,
+        top_k=20, # No filtering based on top-k
+        top_p=0.9, # No filtering based on top-p
+        temperature=0.7, # Just temperature sampling
         n_trials=1,
         repetition_penalty=1.0,
+        max_retries=30
     )
 
 def process_molecules(smiles_list):
@@ -56,19 +57,24 @@ def calculate_properties(mol_list):
         properties['QED'].append(QED.qed(mol))
     return properties
 
-def get_top_k_tokens(model, tokenizer, input_text, k=50):
-    input_ids = tokenizer.encode(input_text, return_tensors="pt").to(model.device)
+def get_top_k_tokens(model, tokenizer, k=100):
+    # Create input with just the BOS token
+    input_ids = torch.tensor([[tokenizer.bos_token_id]]).to(model.device)
+    
     with torch.no_grad():
         outputs = model(input_ids)
         logits = outputs.logits
+        # Get probabilities for the next token after BOS
         probs = torch.softmax(logits[0, -1], dim=-1)
     
     top_k_probs, top_k_indices = torch.topk(probs, k)
     
     results = []
     for prob, index in zip(top_k_probs, top_k_indices):
-        token = tokenizer.decode([index])
-        results.append((token, prob.item()))
+        token = tokenizer.decode([index.item()])
+        token_id = index.item()
+        token_repr = token if token else '<empty>'  # Handle empty string tokens
+        results.append((token, token_repr, token_id, prob.item()))
     
     return results
 
@@ -87,6 +93,10 @@ def evaluate_model(model_dir, tokenizer_path, n_samples=1000, max_length=100):
 
     properties = calculate_properties(generated_mols)
 
+    print("\nFirst 10 generated SMILES:")
+    for smi in generated_smiles:
+        print(smi)
+
     print(f"Number of samples generated: {len(generated_smiles)}")
     print(f"Validity: {validity:.4f}")
     print(f"Uniqueness: {uniqueness:.4f}")
@@ -94,15 +104,21 @@ def evaluate_model(model_dir, tokenizer_path, n_samples=1000, max_length=100):
     for prop, values in properties.items():
         print(f"{prop}: {np.mean(values):.2f} ± {np.std(values):.2f}")
 
-    print("\nFirst 10 generated SMILES:")
-    for smi in generated_smiles[:10]:
-        print(smi)
-
-    # Examine top-k tokens after 'C'
-    print("\nTop 50 tokens after 'C':")
-    top_tokens = get_top_k_tokens(mamba_model, safe_tokenizer, 'C', k=50)
-    for token, prob in top_tokens:
-        print(f"Token: '{token}', Probability: {prob:.4f}")
+    # # Examine top-k tokens after 'C'
+    # print("\nTop 100 tokens after 'C':")
+    # top_tokens = get_top_k_tokens(mamba_model, safe_tokenizer, safe_tokenizer.bos_token_id, k=100)
+    # top_tokens = get_top_k_tokens(mamba_model, safe_tokenizer, k=100)
+    # print(f"The eos token id is: {safe_tokenizer.eos_token_id} and the token is: {safe_tokenizer.decode([safe_tokenizer.eos_token_id])}")
+    # eos_found = False
+    # for i, (token, token_repr, token_id, prob) in enumerate(top_tokens, 1):
+    #     print(f"{i}. Token: '{token_repr}', ID: {token_id}, Probability: {prob:.4f}")
+    #     if token_id == designer.model.config.eos_token_id:
+    #         print(f"EOS token (ID: {token_id}) found at position {i}")
+    #         eos_found = True
+    # if not eos_found:
+    #     print("EOS token not found in top 100 tokens")
+    # else:
+    #     print("EOS token found in top 100 tokens")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate Mamba model for molecule generation")
