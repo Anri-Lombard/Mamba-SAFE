@@ -20,22 +20,24 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def setup_model(model_dir, tokenizer_path, device):
     mamba_model = MAMBAModel.from_pretrained(model_dir, device=device)
+    mamba_model = mamba_model.half()
     safe_tokenizer = SAFETokenizer.from_pretrained(tokenizer_path)
     mamba_model.to(device)
     return mamba_model, safe_tokenizer
 
 def generate_molecules(designer, n_samples, max_length, top_k, top_p, temperature):
-    return designer.de_novo_generation(
-        n_samples_per_trial=n_samples,
-        max_length=max_length,
-        sanitize=True,
-        top_k=top_k,
-        top_p=top_p,
-        temperature=temperature,
-        n_trials=1,
-        repetition_penalty=1.0,
-        max_retries=0
-    )
+    with torch.amp.autocast(dtype=torch.float16):  # Use automatic mixed precision
+        return designer.de_novo_generation(
+            n_samples_per_trial=n_samples,
+            max_length=max_length,
+            sanitize=True,
+            top_k=top_k,
+            top_p=top_p,
+            temperature=temperature,
+            n_trials=1,
+            repetition_penalty=1.0,
+            max_retries=0
+        )
 
 def save_molecules_to_file(molecules, output_file):
     with open(output_file, 'w') as f:
