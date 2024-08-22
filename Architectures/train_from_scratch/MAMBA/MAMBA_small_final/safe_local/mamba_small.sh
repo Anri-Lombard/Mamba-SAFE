@@ -2,7 +2,7 @@
 #SBATCH --account=nlpgroup
 #SBATCH --partition=a100
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
+#SBATCH --ntasks=4
 #SBATCH --gres=gpu:ampere80:1
 #SBATCH --time=48:00:00
 #SBATCH --job-name="SSM_20M_little_dropout"
@@ -62,12 +62,11 @@ dataset_path="/scratch/lmbanr001/Datasets/MOSES/safe_datasets"
 # output_dir="/scratch/lmbanr001/MAMBA_small_dropout_continued"
 # TODO: change this before next run to prevent deletion!
 output_dir="/scratch/lmbanr001/SSM_20M_little_dropout"
-checkpoint_path="/scratch/lmbanr001/SSM_20M_little_dropout/checkpoint-176000"
+# checkpoint_path="/scratch/lmbanr001/SSM_20M_little_dropout/checkpoint-176000"
 
 # Run the training script using cli.py
 # TODO: add model path next time
 python3 trainer/cli.py \
-    --resume_from_checkpoint $checkpoint_path \
     --config_path $config_path \
     --tokenizer_path $tokenizer_path \
     --dataset_path $dataset_path \

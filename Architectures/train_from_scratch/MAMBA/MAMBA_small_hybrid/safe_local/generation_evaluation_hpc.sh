@@ -27,11 +27,13 @@ export TOKENIZERS_PARALLELISM="false"
 
 python3 simplified_molecule_generator.py --model_dir $model_dir \
     --tokenizer_path $tokenizer_path \
-    --num_samples 10000 \
+    --num_samples 100 \
     --max_length 100 \
     --top_k 50 \
-    --top_p 0.9 \
-    --temperature 0.7 \
+    --top_p 0.95 \
+    --temperature 1.0 \
+    --n_trials 100 \
+    --max_retries 10 \
     --output_file $output_file
 
 conda deactivate

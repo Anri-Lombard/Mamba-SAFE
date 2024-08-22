@@ -163,17 +163,20 @@ class MAMBAModel(nn.Module, GenerationMixin):
         self.config.save_pretrained(save_directory)
 
     def generate(self, input_ids, **kwargs):
-        batch_size = input_ids.shape[0]
-        outputs = []
-        for i in range(batch_size):
-            output = decode(
-                input_ids[i:i+1], 
-                self, 
-                kwargs.get('max_length', 100),
-                top_k=kwargs.get('top_k', 0),
-                top_p=kwargs.get('top_p', 1.0),
-                temperature=kwargs.get('temperature', 1.0),
-                repetition_penalty=kwargs.get('repetition_penalty', 1.0),
-            )
-            outputs.append(output.sequences)
-        return torch.cat(outputs, dim=0)
+        max_length = kwargs.get('max_length', 100)
+        top_k = kwargs.get('top_k', 0)
+        top_p = kwargs.get('top_p', 1.0)
+        temperature = kwargs.get('temperature', 1.0)
+        repetition_penalty = kwargs.get('repetition_penalty', 1.0)
+
+        output = decode(
+            input_ids,
+            self,
+            max_length,
+            top_k=top_k,
+            top_p=top_p,
+            temperature=temperature,
+            repetition_penalty=repetition_penalty,
+        )
+        
+        return output.sequences

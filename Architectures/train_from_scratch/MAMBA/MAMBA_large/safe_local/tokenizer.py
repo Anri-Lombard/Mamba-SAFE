@@ -266,28 +266,18 @@ class SAFETokenizer(PushToHubMixin):
         return tk_data
 
     def save_pretrained(self, *args, **kwargs):
-        if hasattr(self.tokenizer, 'save_pretrained'):
-            return self.tokenizer.save_pretrained(*args, **kwargs)
-        else:
-            # Fall back to the custom implementation
-            return self.save(*args, **kwargs)
+        """Save pretrained tokenizer"""
+        self.tokenizer.save_pretrained(*args, **kwargs)
 
     def save(self, file_name=None):
-        """
-        Saves the tokenizer to the file at the given path.
+        r"""
+        Saves the :class:`~tokenizers.Tokenizer` to the file at the given path.
 
         Args:
-            file_name (str, optional): File or directory where to save tokenizer
+            file_name (str, optional): File where to save tokenizer
         """
+        # EN: whole logic here assumes noone is going to mess with the special token
         tk_data = self.to_dict()
-        
-        # If file_name is a directory, append the default filename
-        if os.path.isdir(file_name):
-            file_name = os.path.join(file_name, self.vocab_files_names)
-        
-        # Ensure the directory exists
-        os.makedirs(os.path.dirname(file_name), exist_ok=True)
-
         with fsspec.open(file_name, "w", encoding="utf-8") as OUT:
             out_str = json.dumps(tk_data, ensure_ascii=False)
             OUT.write(out_str)

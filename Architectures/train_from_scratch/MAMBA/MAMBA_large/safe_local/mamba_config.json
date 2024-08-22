@@ -1,12 +1,11 @@
 {
   "d_model": 768,
   "n_layer": 12,
-  "d_intermediate": 2048,
-  "hidden_act": "silu",
+  "tie_embeddings": true,
   "ssm_cfg": {
     "layer": "Mamba2"
   },
-  "dropout_rate": 0.3,
+  "dropout_rate": 0.1,
   "rms_norm": true,
   "residual_in_fp32": true,
   "vocab_size": 1880,

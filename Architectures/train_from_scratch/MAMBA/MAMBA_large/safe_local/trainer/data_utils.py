@@ -86,71 +86,36 @@ def get_dataset(
     tokenizer: Optional[Callable] = None,
     cache_dir: Optional[str] = None,
     streaming: bool = True,
-    use_auth_token: bool = False,
-    tokenize_column: Optional[str] = "inputs",
-    property_column: Optional[str] = "descriptors",
+    tokenize_column: str = "text",
     max_length: Optional[int] = None,
-    num_shards=1024,
+    num_shards: int = 1024,
 ):
-    """Get the datasets from the config file"""
-    raw_datasets = {}
-    print(f'{data_path} is not none: {data_path is not None}')
-    if data_path is not None:
-        print(f'{data_path}')
-        data_path = upath.UPath(str(data_path))
+    """Get the dataset for Mamba model training"""
+    if data_path is None:
+        raise ValueError("data_path must be provided")
 
-        if data_path.exists():
-            # the we need to load from disk
-            data_path = str(data_path)
-            # for some reason, the datasets package is not able to load the dataset
-            # because the split where not originally proposed
-            raw_datasets = datasets.load_from_disk(data_path)
+    data_path = upath.UPath(str(data_path))
 
-            if streaming:
-                if isinstance(raw_datasets, datasets.DatasetDict):
-                    previous_num_examples = {k: len(dt) for k, dt in raw_datasets.items()}
-                    raw_datasets = datasets.IterableDatasetDict(
-                        {
-                            k: dt.to_iterable_dataset(num_shards=num_shards)
-                            for k, dt in raw_datasets.items()
-                        }
-                    )
-                    for k, dt in raw_datasets.items():
-                        if previous_num_examples[k] is not None:
-                            setattr(dt, "num_examples", previous_num_examples[k])
-                else:
-                    num_examples = len(raw_datasets)
-                    raw_datasets = raw_datasets.to_iterable_dataset(num_shards=num_shards)
-                    setattr(raw_datasets, "num_examples", num_examples)
+    if data_path.exists():
+        raw_datasets = datasets.load_from_disk(str(data_path))
 
-        else:
-            data_path = str(data_path)
-            raw_datasets = datasets.load_dataset(
-                data_path,
-                name=name,
-                cache_dir=cache_dir,
-                use_auth_token=True if use_auth_token else None,
-                streaming=streaming,
-            )
-    # that means we need to return a tokenized version of the dataset
+        if streaming:
+            if isinstance(raw_datasets, datasets.DatasetDict):
+                raw_datasets = datasets.IterableDatasetDict({
+                    k: dt.to_iterable_dataset(num_shards=num_shards)
+                    for k, dt in raw_datasets.items()
+                })
+            else:
+                raw_datasets = raw_datasets.to_iterable_dataset(num_shards=num_shards)
+    else:
+        raw_datasets = datasets.load_dataset(
+            data_path,
+            name=name,
+            cache_dir=cache_dir,
+            streaming=streaming,
+        )
 
-    if property_column not in ["mc_labels", None]:
-        raw_datasets = raw_datasets.rename_column(property_column, "mc_labels")
-
-    columns_to_remove = None
-    if tokenize_column is not None:
-        columns_to_remove = [
-            x
-            for x in (get_dataset_column_names(raw_datasets) or [])
-            if x not in [tokenize_column, "mc_labels"] and "label" not in x
-        ] or None
-
-    if tokenizer is None:
-        if columns_to_remove is not None:
-            raw_datasets = raw_datasets.remove_columns(columns_to_remove)
-        return raw_datasets
-
-    return raw_datasets.map(
+    raw_datasets = raw_datasets.map(
         partial(
             tokenize_fn,
             tokenizer=tokenizer,
@@ -158,5 +123,7 @@ def get_dataset(
             max_length=max_length,
         ),
         batched=True,
-        remove_columns=columns_to_remove,
+        remove_columns=[col for col in raw_datasets["train"].column_names if col != tokenize_column]
     )
+
+    return raw_datasets

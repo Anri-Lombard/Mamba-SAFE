@@ -191,13 +191,12 @@ class MixerModel(nn.Module):
 
     def forward(self, input_ids, inference_params=None, **mixer_kwargs):
         hidden_states = self.embedding(input_ids)
-        hidden_states = self.dropout(hidden_states)
+        hidden_states = self.dropout(hidden_states) # Similar to GPT2
         residual = None
         for layer in self.layers:
             hidden_states, residual = layer(
                 hidden_states, residual, inference_params=inference_params, **mixer_kwargs
             )
-            hidden_states = self.dropout(hidden_states)
         if not self.fused_add_norm:
             residual = (hidden_states + residual) if residual is not None else hidden_states
             hidden_states = self.norm_f(residual.to(dtype=self.norm_f.weight.dtype))
@@ -286,7 +285,6 @@ class MambaLMHeadModel(nn.Module, GenerationMixin):
         hidden_states = self.backbone(input_ids, inference_params=inference_params, **mixer_kwargs)
         if num_last_tokens > 0:
             hidden_states = hidden_states[:, -num_last_tokens:]
-        hidden_states = self.dropout(hidden_states)
         lm_logits = self.lm_head(hidden_states)
         CausalLMOutput = namedtuple("CausalLMOutput", ["logits"])
         return CausalLMOutput(logits=lm_logits)

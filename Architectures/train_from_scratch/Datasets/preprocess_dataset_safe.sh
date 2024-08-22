@@ -3,7 +3,7 @@
 #SBATCH --partition=a100
 #SBATCH --nodes=1 --ntasks=1 --gres=gpu:a100-3g-20gb:1
 #SBATCH --time=04:00:00
-#SBATCH --job-name="ConvertSMILEStoSAFE"
+#SBATCH --job-name="ConvertSMILEStoSAFE_large_dataset"
 #SBATCH --mail-user=lmbanr001@myuct.ac.za
 #SBATCH --mail-type=ALL
 
