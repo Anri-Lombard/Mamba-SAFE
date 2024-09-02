@@ -22,8 +22,8 @@ pip install mamba-safe
 To install the latest development version from source:
 
 ```bash
-git clone https://github.com/Anri-Lombard/DrugGPT.git
-cd DrugGPT/mamba_safe
+git clone https://github.com/Anri-Lombard/Mamba-SAFE.git
+cd Mamba-SAFE/mamba_safe
 pip install -e .
 ```
 
@@ -171,4 +171,4 @@ This library and the work it enables would not have been possible without their 
 
 ## Contact
 
-For questions and support, please open an issue on our [GitHub repository](https://github.com/Anri-Lombard/DrugGPT) or contact Anri Lombard at anri.m.lombard@gmail.com.
+For questions and support, please open an issue on our [GitHub repository](https://github.com/Anri-Lombard/Mamba-SAFE) or contact Anri Lombard at anri.m.lombard@gmail.com.
