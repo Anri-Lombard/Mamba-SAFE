@@ -70,7 +70,7 @@ for smi in generated_smiles[:10]:
 
 ### Training a Model from Scratch
 
-To train a Mamba-SAFE model from scratch, you can use the `safe-train` CLI. Here's an example script:
+To train a Mamba-SAFE model from scratch, you can use the `safe-train` CLI, adapted from https://safe-docs.datamol.io/stable/. Here's an example script:
 
 ```bash
 #!/bin/bash
