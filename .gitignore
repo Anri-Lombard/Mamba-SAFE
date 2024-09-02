@@ -10,3 +10,9 @@
 *.parquet
 *.pkl
 *.zip
+
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.egg-info/

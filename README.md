@@ -1,51 +1,174 @@
-# DrugGPT
+# Mamba-SAFE: Molecular Generation with Mamba and SAFE
 
-Comparing performance of molecule generation with transfomer-based and state space model architectures.
+Mamba-SAFE is a framework for generating molecules using the Mamba architecture and the SAFE (Structure-Agnostic Few-shot Encoding) representation (although any other representation could be used if needed). This library combines the power of the Mamba sequence modeling architecture with the versatility of the SAFE molecular representation.
 
-Transformers tend to do extremely well with generating molecules because it's attention mechanism captures context quite well, although the O($n^2$) complexity causes it to be very inefficient for long sequences.
+## Features
 
-State space models has an O(n) complexity and has shown comparable performance to transformers in simpler tasks, but with promising results generating longer sequences.
+- Generate molecules using the Mamba architecture
+- Utilize the SAFE representation for molecular encoding
 
-These benefits have not been shown with molecular generation, resulting in the goal of this research: analyze and compare the performance of these architectures for molecular generation on specific metrics (laid out in the [proposal](./Proposal.pdf)).
+## Installation
 
-## Training
+### From PyPI
 
-### SAFE-GPT
+To install the latest stable version from PyPI:
 
-We utilize some of the [SAFE library](https://github.com/datamol-io/safe) although some functionality like gradient clipping and using huggingface datasets does not work at the time of this research, therefore we use the necessary code and extended functionality as needed.
-
-We attempt to reproduce results from the [SAFE paper](https://arxiv.org/pdf/2310.10773) by training the small model (20M parameters) and a "medium" model (roughtly 50M parameters) which we'll compare with the MAMBA models of similar size.
-
-1. Our 20M model lives [here](./Architectures/train_from_scratch/SAFE_GPT/SAFE_small/). We simply use the cli developed by the SAFE authors to train the small model on the MOSES dataset (1.1M molecules).
-2. Our 50M model lives [here](./Architectures/train_from_scratch/SAFE_GPT/SAFE_large/). Here we use a huggingface dataset I prepared with 370M molecules (300M train and 70M test) so had to take the necessary code and extend functionality, as seen by the `safe-local` folder, and not using the cli, but rather running `python3 trainer/cli.py`.
-
-### MAMBA
-
-We used the foundational SAFE code, but switched out the model logic to rather use the [MAMBA model](https://github.com/state-spaces/mamba/tree/main/mamba_ssm). We had to change the model code but also alter much of the training, data, and trainer functionality to integrate MAMBA.
-
-1. Our 20M model lives [here](./Architectures/train_from_scratch/MAMBA/MAMBA_small_final/safe_local/) (the bash script). The model we built can be found in the [mamba_model script](./Architectures/train_from_scratch/MAMBA/MAMBA_small_final/safe_local/trainer/mamba_model.py). We build the model based on the [LLM Head](./Architectures/train_from_scratch/MAMBA/MAMBA_small_final/safe_local/trainer/mixer_seq_simple.py) model by the MAMBA authors. The main training logic is inside [cli.py](./Architectures/train_from_scratch/MAMBA/MAMBA_small_final/safe_local/trainer/cli.py) with the collator and trainer in the same directory. I implemented gradient clipping and weight decay as this did not seem to work out the box from the SAFE library (shown in the trainer_utils.py file) and altered the loss computation slightly to work with our MAMBA model.
-2. Our 50M model lives [here](./Architectures/train_from_scratch/MAMBA/MAMBA_large/safe_local/), and has the same code as the smaller model; the only change is parameters passed into cli.py from the bash script.
-
-For generation we use the [code provided by the authors](https://github.com/state-spaces/mamba/blob/main/mamba_ssm/utils/generation.py).
-
-## Results and Evaluation
-
-As of this writing the large models are training, but the small SAFE model and MAMBA model have some [preliminary results](./Architectures/result_and_evaluation/).
-
-MAMBA requires a GPU to evaluate, thus making the process somewhat more tedious - the plots of it's results are to come later on, although initial exploration has shown very bad QED scores (0.04±0.02), although this could be due to my top_k and top_p parameters during [evaluation](./Architectures/train_from_scratch/MAMBA/MAMBA_small_final/safe_local/evaluate_mamba_small.py). Specifically refering to the generate_molecule function:
-
-```py
-def generate_molecules(designer, n_samples=1000, max_length=100):
-    return designer.de_novo_generation(
-        n_samples_per_trial=n_samples,
-        max_length=max_length,
-        sanitize=True,
-        top_k=15,
-        top_p=0.9,
-        temperature=0.8,
-        n_trials=1,
-        repetition_penalty=1.0,
-    )
+```bash
+pip install mamba-safe
 ```
 
-I think exploring where the eos token ranks in the top k tokens would be useful, and then increasing top k as well as top p to generate molecules including eos. This might improve QED results (to be confirmed).
+### From Source
+
+To install the latest development version from source:
+
+```bash
+git clone https://github.com/Anri-Lombard/DrugGPT.git
+cd DrugGPT/mamba_safe
+pip install -e .
+```
+
+**Note:** Make sure you have CUDA installed, as `mamba_ssm` requires it (https://github.com/state-spaces/mamba).
+
+## Usage
+
+### Generating Molecules
+
+Here's a simple example of how to generate molecules using a trained Mamba-SAFE model:
+
+```python
+import torch
+from mamba_safe import MAMBAModel, SAFETokenizer, SAFEDesign
+
+# Set up your model and parameters
+model_dir = "path/to/your/model"
+tokenizer_path = "path/to/your/tokenizer"
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+# Load model and tokenizer
+mamba_model = MAMBAModel.from_pretrained(model_dir, device=device)
+safe_tokenizer = SAFETokenizer.from_pretrained(tokenizer_path)
+
+# Create designer
+designer = SAFEDesign(model=mamba_model, tokenizer=safe_tokenizer, verbose=True)
+
+# Generate molecules
+generated_smiles = designer.de_novo_generation(
+    n_samples_per_trial=100,
+    max_length=50,
+    sanitize=True,
+    top_k=15,
+    top_p=0.9,
+    temperature=0.7,
+    n_trials=10,
+    repetition_penalty=1.0
+)
+
+# Print the first 10 generated SMILES
+for smi in generated_smiles[:10]:
+    print(smi)
+```
+
+### Training a Model from Scratch
+
+To train a Mamba-SAFE model from scratch, you can use the `safe-train` CLI. Here's an example script:
+
+```bash
+#!/bin/bash
+
+# Set up environment variables
+export WANDB_API_KEY="your_wandb_api_key"
+
+# Set up paths
+config_path="example_config.json"
+tokenizer_path="tokenizer.json"
+dataset_path="/path/to/safe_zinc_dataset"
+output_dir="/path/to/output"
+
+# Run the training script
+safe-train \
+    --config_path $config_path \
+    --tokenizer_path $tokenizer_path \
+    --dataset_path $dataset_path \
+    --text_column "safe" \
+    --optim "adamw_torch" \
+    --report_to "wandb" \
+    --load_best_model_at_end True \
+    --metric_for_best_model "eval_loss" \
+    --learning_rate 1e-4 \
+    --per_device_train_batch_size 100 \
+    --per_device_eval_batch_size 100 \
+    --gradient_accumulation_steps 2 \
+    --warmup_steps 10000 \
+    --logging_first_step True \
+    --save_steps 10000 \
+    --eval_steps 10000 \
+    --eval_accumulation_steps 1000 \
+    --eval_strategy "steps" \
+    --wandb_project "MAMBA_large" \
+    --logging_steps 100 \
+    --save_total_limit 1 \
+    --output_dir $output_dir \
+    --overwrite_output_dir True \
+    --do_train True \
+    --do_eval True \
+    --save_safetensors True \
+    --gradient_checkpointing True \
+    --max_grad_norm 1.0 \
+    --weight_decay 0.1 \
+    --max_steps 250000
+```
+
+Make sure to adjust the paths and parameters according to your specific setup and requirements.
+
+## Important Notes
+
+1. Do not install both `safe-mol` and `mamba-safe` in the same environment to avoid conflicts. Use `safe-mol` for transformer architectures and `mamba-safe` for Mamba-based models.
+
+2. CUDA is required to run this package efficiently, as `mamba_ssm` relies on CUDA for optimal performance.
+
+## Citation
+
+If you use Mamba-SAFE in your research, please cite the following papers:
+
+```bibtex
+@article{noutahi2024gotta,
+  title={Gotta be SAFE: a new framework for molecular design},
+  author={Noutahi, Emmanuel and Gabellini, Cristian and Craig, Michael and Lim, Jonathan SC and Tossou, Prudencio},
+  journal={Digital Discovery},
+  volume={3},
+  number={4},
+  pages={796--804},
+  year={2024},
+  publisher={Royal Society of Chemistry}
+}
+
+@article{gu2023mamba,
+  title={Mamba: Linear-time sequence modeling with selective state spaces},
+  author={Gu, Albert and Dao, Tri},
+  journal={arXiv preprint arXiv:2312.00752},
+  year={2023}
+}
+```
+
+## Contributing
+
+We welcome contributions! Please see our [CONTRIBUTING.md](link-to-contributing-guide) for details on how to get started.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](link-to-license-file) file for details.
+
+## Acknowledgments
+
+We would like to express our sincere gratitude to:
+
+- The SAFE authors for their pivotal work in sequence representation and molecular generation. Their contributions have been instrumental in the development of this library.
+- The Mamba authors for their groundbreaking work in language model architectures. Their innovations have made this work possible.
+- [SAFE](https://github.com/datamol-io/safe) for providing the molecular representation framework that forms the backbone of our approach.
+- [Mamba](https://github.com/state-spaces/mamba) for developing the sequence modeling architecture that powers our models.
+
+This library and the work it enables would not have been possible without their significant contributions to the field.
+
+## Contact
+
+For questions and support, please open an issue on our [GitHub repository](https://github.com/Anri-Lombard/DrugGPT) or contact Anri Lombard at anri.m.lombard@gmail.com.

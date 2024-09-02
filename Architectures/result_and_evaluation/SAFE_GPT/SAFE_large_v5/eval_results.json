@@ -1,7 +1,0 @@
-{
-    "epoch": 1.0,
-    "eval_runtime": 3342.8782,
-    "eval_samples_per_second": 687.806,
-    "eval_steps_per_second": 85.976,
-    "perplexity": Infinity
-}
