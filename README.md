@@ -150,14 +150,6 @@ If you use Mamba-SAFE in your research, please cite the following papers:
 }
 ```
 
-## Contributing
-
-We welcome contributions! Please see our [CONTRIBUTING.md](link-to-contributing-guide) for details on how to get started.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](link-to-license-file) file for details.
-
 ## Acknowledgments
 
 We would like to express our sincere gratitude to:
@@ -168,7 +160,3 @@ We would like to express our sincere gratitude to:
 - [Mamba](https://github.com/state-spaces/mamba) for developing the sequence modeling architecture that powers our models.
 
 This library and the work it enables would not have been possible without their significant contributions to the field.
-
-## Contact
-
-For questions and support, please open an issue on our [GitHub repository](https://github.com/Anri-Lombard/Mamba-SAFE) or contact Anri Lombard at anri.m.lombard@gmail.com.
