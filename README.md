@@ -131,6 +131,15 @@ Make sure to adjust the paths and parameters according to your specific setup an
 If you use Mamba-SAFE in your research, please cite the following papers:
 
 ```bibtex
+@inproceedings{
+  lombard2024molecular,
+  title={Molecular Generation with State Space Sequence Models},
+  author={Anri Lombard and Shane Acton and Ulrich Armel Mbou Sob and Jan Buys},
+  booktitle={NeurIPS 2024 Workshop on AI for New Drug Modalities},
+  year={2024},
+  url={https://openreview.net/forum?id=1ib5oyTQIb}
+}
+
 @article{noutahi2024gotta,
   title={Gotta be SAFE: a new framework for molecular design},
   author={Noutahi, Emmanuel and Gabellini, Cristian and Craig, Michael and Lim, Jonathan SC and Tossou, Prudencio},
