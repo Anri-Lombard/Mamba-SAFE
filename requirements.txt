@@ -1,0 +1,22 @@
+# Mamba-SAFE needs a Linux machine with an NVIDIA GPU and CUDA:
+# mamba-ssm and causal-conv1d build CUDA kernels and will not install on CPU-only or macOS.
+# Install a CUDA build of torch first (https://pytorch.org/get-started/locally/), then:
+#   pip install -r requirements.txt
+torch
+mamba-ssm>=2.0  # code imports mamba_ssm.modules.mamba2
+causal-conv1d
+transformers
+accelerate
+datasets
+tokenizers
+rdkit
+datamol
+numpy
+networkx
+loguru
+tqdm
+fsspec
+universal-pathlib
+matplotlib
+packaging
+wandb  # optional, only for --report_to wandb
