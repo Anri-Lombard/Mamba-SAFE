@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="mamba-safe",
-    version="1.0.1",
+    version="1.0.2",
     author="Anri Lombard",
     author_email="anri.m.lombard@gmail.com",
     description="A framework to generate molecules with the mamba architecture",

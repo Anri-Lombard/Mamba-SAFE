@@ -17,3 +17,5 @@ build/
 dist/
 *.egg-info/
 !requirements.txt
+dist/
+build/
