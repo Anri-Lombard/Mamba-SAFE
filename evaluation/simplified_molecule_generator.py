@@ -12,10 +12,10 @@ sys.path.insert(0, parent_dir)
 trainer_dir = os.path.join(parent_dir, 'trainer')
 sys.path.insert(0, trainer_dir)
 
-from safe_local.tokenizer import SAFETokenizer
-from safe_local.trainer.mamba_model import MAMBAModel
-import safe_local as sf
-from safe_local._exception import SAFEDecodeError
+from mamba_safe.tokenizer import SAFETokenizer
+from mamba_safe.trainer.mamba_model import MAMBAModel
+import mamba_safe as sf
+from mamba_safe._exception import SAFEDecodeError
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 

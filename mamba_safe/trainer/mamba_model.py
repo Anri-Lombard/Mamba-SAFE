@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from safe_local.trainer.mixer_seq_simple import MambaLMHeadModel, MixerModel
+from mamba_safe.trainer.mixer_seq_simple import MambaLMHeadModel, MixerModel
 from mamba_ssm.utils.generation import GenerationMixin, decode
 import os
 import json

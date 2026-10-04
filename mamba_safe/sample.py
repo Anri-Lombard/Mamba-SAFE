@@ -14,11 +14,11 @@ from tqdm.auto import tqdm
 from transformers import GenerationConfig
 from transformers.generation import DisjunctiveConstraint, PhrasalConstraint
 
-import safe_local as sf
-from safe_local.tokenizer import SAFETokenizer
-# from safe_local.trainer.model import SAFEDoubleHeadsModel
+import mamba_safe as sf
+from mamba_safe.tokenizer import SAFETokenizer
+# from mamba_safe.trainer.model import SAFEDoubleHeadsModel
 
-from safe_local.trainer.mamba_model import MAMBAModel
+from mamba_safe.trainer.mamba_model import MAMBAModel
 
 
 class SAFEDesign:

@@ -7,7 +7,7 @@ import datasets
 import upath
 from tqdm.auto import tqdm
 
-from safe_local.tokenizer import SAFETokenizer
+from mamba_safe.tokenizer import SAFETokenizer
 
 
 def take(n, iterable):

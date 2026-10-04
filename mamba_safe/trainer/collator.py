@@ -7,7 +7,7 @@ import torch
 from tokenizers import Tokenizer
 from transformers.data.data_collator import _torch_collate_batch
 
-from safe_local.tokenizer import SAFETokenizer
+from mamba_safe.tokenizer import SAFETokenizer
 
 
 class SAFECollator:

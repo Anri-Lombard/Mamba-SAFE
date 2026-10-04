@@ -8,36 +8,22 @@ from typing import Literal, Optional
 import json
 
 import datasets
-import evaluate
 import torch
 import transformers
 from loguru import logger
-from transformers import AutoTokenizer, TrainingArguments, HfArgumentParser, set_seed
+from transformers import TrainingArguments, HfArgumentParser, set_seed
 from transformers.trainer_utils import get_last_checkpoint
-from transformers.utils.logging import log_levels as LOG_LEVELS
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)  # This should be the directory containing safe_local
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
+# Make the repo root (the directory containing mamba_safe/) importable when run as a script
+repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
-print("Current working directory:", os.getcwd())
-print("Python path:", sys.path)
-
-try:
-    import safe_local
-    print("Successfully imported safe_local")
-except ImportError as e:
-    print(f"Failed to import safe_local: {e}")
-    print("Contents of parent directory:")
-    print(os.listdir(parent_dir))
-
-from safe_local.tokenizer import SAFETokenizer
-from safe_local.trainer.collator import SAFECollator
-from safe_local.trainer.data_utils import get_dataset
-from safe_local.trainer.trainer_utils import SAFETrainer
-
-from mamba_model import MAMBAConfig, MAMBAModel
+from mamba_safe.tokenizer import SAFETokenizer
+from mamba_safe.trainer.collator import SAFECollator
+from mamba_safe.trainer.data_utils import get_dataset
+from mamba_safe.trainer.trainer_utils import SAFETrainer
+from mamba_safe.trainer.mamba_model import MAMBAConfig, MAMBAModel
 
 
 @dataclass

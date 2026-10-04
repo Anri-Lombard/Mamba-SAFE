@@ -40,8 +40,7 @@ export WANDB_TMPDIR=$TMPDIR
 # Set up the PYTHONPATH
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-# make sure this script is in the same directory as mamba_safe and replace
-# ... with your path to the mamba_safe directory
+# replace ... with the path to the repo root (the directory containing mamba_safe/)
 export PYTHONPATH="...:$PYTHONPATH"
 
 echo "Current working directory: $(pwd)"
@@ -55,9 +54,7 @@ dataset_path=".../safe_zinc_dataset"
 output_dir="..."
 
 # Run the training script using cli.py
-# TODO: add model path next time
-python3 trainer/cli.py \
-    --resume_from_checkpoint $checkpoint_path \
+python3 -m mamba_safe.trainer.cli \
     --config_path $config_path \
     --tokenizer_path $tokenizer_path \
     --dataset_path $dataset_path \

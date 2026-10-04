@@ -11,9 +11,8 @@ setup(
     description="A framework to generate molecules with the mamba architecture",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/Anri-Lombard/DrugGPT",
-    packages=find_packages(where="mamba_safe"),
-    package_dir={"": "mamba_safe"},
+    url="https://github.com/Anri-Lombard/Mamba-SAFE",
+    packages=find_packages(include=["mamba_safe", "mamba_safe.*"]),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
